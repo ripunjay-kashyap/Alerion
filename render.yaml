@@ -3,11 +3,14 @@ services:
     name: alerion-backend
     runtime: python
     rootDir: backend
-    plan: starter            # avoid free-tier cold starts during judging
+    plan: free               # sleeps after 15 min idle: warm it up (open /api/health) before judging
     buildCommand: pip install uv && uv sync --frozen --no-dev
     startCommand: uv run --no-dev uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers
     healthCheckPath: /api/health
     envVars:
+      # uv-managed Python must live inside the project dir: Render only keeps /opt/render/project/src at runtime
+      - key: UV_PYTHON_INSTALL_DIR
+        value: /opt/render/project/src/.uv-python
       - key: DATABASE_URL
         sync: false
       - key: MAPBOX_TOKEN
