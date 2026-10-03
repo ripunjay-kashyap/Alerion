@@ -1,0 +1,81 @@
+- generic [ref=f4e2]:
+  - banner [ref=f4e3]:
+    - generic [ref=f4e4]:
+      - generic [ref=f4e5]:
+        - generic [aria-hidden] [ref=f4e6]: ◈
+        - generic [ref=f4e7]:
+          - heading "DISASTER RELIEF ROUTER" [level=1] [ref=f4e8]
+          - paragraph [ref=f4e9]: GUWAHATI, ASSAM / FLOOD RESPONSE
+      - generic [ref=f4e10]:
+        - generic [ref=f4e11]: MOCK DEMO
+        - generic [ref=f4e12]: CONNECTING
+        - generic [ref=f4e14]: NUROEN UNKNOWN
+        - group "Orchestration mode" [ref=f4e16]:
+          - button "LOCAL" [disabled] [ref=f4e17]
+          - button "NUROEN" [disabled] [ref=f4e18]
+    - generic [ref=f4e19]:
+      - generic [ref=f4e20]:
+        - generic [ref=f4e21]: — reports
+        - generic "Duplicate merges avoid repeated agent processing" [ref=f4e22]: — duplicates merged (agent runs saved)
+        - generic [ref=f4e23]: — Nuroen
+        - generic [ref=f4e24]: — local
+      - generic [ref=f4e25]: INTAKE → TRIAGE → GOVERNANCE → DISPATCH
+    - generic [ref=f4e26]:
+      - generic [ref=f4e27]: SCENARIO
+      - button "▶ Start timed" [disabled] [ref=f4e28]
+      - button "Start manual" [disabled] [ref=f4e29]
+      - button "Next event →" [disabled] [ref=f4e30]
+      - generic [ref=f4e31]: LOADING
+      - button "↺ Reset" [disabled] [ref=f4e32]
+  - generic [ref=f4e33]:
+    - complementary [ref=f4e34]:
+      - generic [ref=f4e35]:
+        - generic [ref=f4e36]:
+          - heading "Live incident feed" [level=2] [ref=f4e37]
+          - generic [ref=f4e38]: 0 incidents
+        - generic [ref=f4e39]:
+          - text: PRIORITY ↓
+          - generic [ref=f4e40]: BACKEND STATE
+        - paragraph [ref=f4e41]: Loading reports…
+      - group [ref=f4e42]:
+        - generic "+ SUBMIT INCIDENT REPORT" [ref=f4e43] [cursor=pointer]
+        - option "Official"
+        - option "Verified operator"
+        - option "Citizen" [selected]
+        - option "Anonymous"
+    - main "Operations map" [ref=f4e44]:
+      - generic [ref=f4e45]: Loading operations map…
+    - complementary [ref=f4e46]:
+      - generic [ref=f4e47]:
+        - generic [ref=f4e48]:
+          - heading "Governance · approvals" [level=2] [ref=f4e49]
+          - generic [ref=f4e50]: 0 pending
+        - paragraph [ref=f4e51]: Loading approval queue…
+      - generic [ref=f4e52]:
+        - generic [ref=f4e53]:
+          - heading "Policy decisions" [level=2] [ref=f4e54]
+          - generic [ref=f4e55]: "0"
+        - paragraph [ref=f4e56]: Loading policy audit…
+  - generic [ref=f4e57]:
+    - generic [ref=f4e58]:
+      - button "▾ AGENT PIPELINE / AUDIT 0 EVENTS" [expanded] [ref=f4e59] [cursor=pointer]:
+        - text: ▾ AGENT PIPELINE / AUDIT
+        - generic [ref=f4e60]: 0 EVENTS
+      - generic [ref=f4e61]: Select an incident to inspect decisions
+    - generic [ref=f4e62]:
+      - generic [ref=f4e63]: Select an incident to inspect its agent pipeline.
+      - generic [ref=f4e64]:
+        - generic [ref=f4e65]:
+          - generic [ref=f4e66]:
+            - button "All" [ref=f4e67] [cursor=pointer]
+            - button "This incident" [disabled] [ref=f4e68]
+          - combobox "Filter audit by stage" [ref=f4e69]:
+            - option "All stages" [selected]
+            - option "Intake"
+            - option "Triage"
+            - option "Governance"
+            - option "Dispatch"
+            - option "Adaptation"
+            - option "System"
+          - generic [ref=f4e70]: 0 events
+        - paragraph [ref=f4e72]: Loading audit events…

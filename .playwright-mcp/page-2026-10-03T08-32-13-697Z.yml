@@ -1,0 +1,81 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - generic [aria-hidden] [ref=e6]: ◈
+          - generic [ref=e7]:
+            - heading "DISASTER RELIEF ROUTER" [level=1] [ref=e8]
+            - paragraph [ref=e9]: GUWAHATI, ASSAM
+        - generic [ref=e10]:
+          - generic [ref=e11]: MOCK DEMO
+          - generic [ref=e12]: CONNECTING
+          - generic [ref=e14]: NUROEN UNKNOWN
+          - group "Orchestration mode" [ref=e16]:
+            - button "LOCAL" [disabled] [ref=e17]
+            - button "NUROEN" [disabled] [ref=e18]
+      - generic [ref=e20]:
+        - generic [ref=e21]: — reports
+        - generic "Duplicate merges avoid repeated agent processing" [ref=e22]: — duplicates merged (agent runs saved)
+        - generic [ref=e23]: — Nuroen
+        - generic [ref=e24]: — local
+      - generic [ref=e25]:
+        - generic [ref=e26]: SCENARIO
+        - button "▶ Start timed" [disabled] [ref=e27]
+        - button "Start manual" [disabled] [ref=e28]
+        - button "Next event →" [disabled] [ref=e29]
+        - generic [ref=e30]: LOADING
+        - button "↺ Reset" [disabled] [ref=e31]
+    - generic [ref=e32]:
+      - complementary [ref=e33]:
+        - generic [ref=e34]:
+          - generic [ref=e35]:
+            - heading "Live incident feed" [level=2] [ref=e36]
+            - generic [ref=e37]: 0 incidents
+          - generic [ref=e38]:
+            - text: PRIORITY ↓
+            - generic [ref=e39]: BACKEND STATE
+          - paragraph [ref=e40]: Loading reports…
+        - group [ref=e41]:
+          - generic "+ SUBMIT INCIDENT REPORT" [ref=e42] [cursor=pointer]
+          - option "Official"
+          - option "Verified operator"
+          - option "Citizen" [selected]
+          - option "Anonymous"
+      - main "Operations map" [ref=e43]:
+        - generic [ref=e44]: Loading operations map…
+      - complementary [ref=e45]:
+        - generic [ref=e46]:
+          - generic [ref=e47]:
+            - heading "Governance · approvals" [level=2] [ref=e48]
+            - generic [ref=e49]: 0 pending
+          - paragraph [ref=e50]: Loading approval queue…
+        - generic [ref=e51]:
+          - generic [ref=e52]:
+            - heading "Policy decisions" [level=2] [ref=e53]
+            - generic [ref=e54]: "0"
+          - paragraph [ref=e55]: Loading policy audit…
+    - generic [ref=e56]:
+      - generic [ref=e57]:
+        - button "▾ AGENT PIPELINE / AUDIT 0 EVENTS" [expanded] [ref=e58] [cursor=pointer]:
+          - text: ▾ AGENT PIPELINE / AUDIT
+          - generic [ref=e59]: 0 EVENTS
+        - generic [ref=e60]: Select an incident to inspect decisions
+      - generic [ref=e61]:
+        - generic [ref=e62]: Select an incident to inspect its agent pipeline.
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - generic [ref=e65]:
+              - button "All" [ref=e66] [cursor=pointer]
+              - button "This incident" [disabled] [ref=e67]
+            - combobox "Filter audit by stage" [ref=e68]:
+              - option "All stages" [selected]
+              - option "Intake"
+              - option "Triage"
+              - option "Governance"
+              - option "Dispatch"
+              - option "Adaptation"
+              - option "System"
+            - generic [ref=e69]: 0 events
+          - paragraph [ref=e71]: Loading audit events…
+  - button "Open Next.js Dev Tools" [ref=e77] [cursor=pointer]
