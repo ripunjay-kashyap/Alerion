@@ -10,7 +10,7 @@ export function useHighlight(
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const animation = ref.current?.animate(
       [
-        { boxShadow: "inset 0 0 0 1px #93c5fd" },
+        { boxShadow: "inset 0 0 0 1px #889780" },
         { boxShadow: "inset 0 0 0 1px transparent" },
       ],
       { duration: 1200, easing: "ease-out" },

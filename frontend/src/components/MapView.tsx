@@ -28,14 +28,14 @@ const activeAssignment = (a: Assignment) =>
   ["ACTIVE", "REROUTING", "AWAITING_APPROVAL", "PROPOSED"].includes(a.status);
 const reportColor = (status: string, priority: number | null) =>
   status === "NEEDS_REVIEW"
-    ? "#94a3b8"
+    ? "#878e80"
     : status === "COMPLETED"
-      ? "#34d399"
+      ? "#4f7056"
       : (priority ?? 0) >= 70
-        ? "#f87171"
+        ? "#aa5649"
         : (priority ?? 0) >= 40
-          ? "#fbbf24"
-          : "#facc15";
+          ? "#a17c35"
+          : "#a48e48";
 const eta = (seconds: number | null) =>
   seconds === null ? "—" : `${Math.ceil(seconds / 60)} min`;
 function previousOpacity(a: Assignment, selected: boolean) {
@@ -164,7 +164,7 @@ function addLayers(m: mapboxgl.Map) {
     source: "hazards",
     filter: ["==", ["geometry-type"], "Polygon"],
     paint: {
-      "fill-color": "#2563eb",
+      "fill-color": "#72909f",
       "fill-opacity": ["case", ["get", "active"], 0.3, 0],
     },
   });
@@ -177,7 +177,7 @@ function addLayers(m: mapboxgl.Map) {
       ["==", ["geometry-type"], "Polygon"],
       ["==", ["get", "active"], true],
     ],
-    paint: { "line-color": "#60a5fa", "line-width": ["get", "pulse_width"] },
+    paint: { "line-color": "#557385", "line-width": ["get", "pulse_width"] },
   });
   m.addLayer({
     id: "hazard-inactive",
@@ -189,7 +189,7 @@ function addLayers(m: mapboxgl.Map) {
       ["==", ["get", "active"], false],
     ],
     paint: {
-      "line-color": "#94a3b8",
+      "line-color": "#878e80",
       "line-width": 2,
       "line-dasharray": [3, 2],
     },
@@ -204,7 +204,7 @@ function addLayers(m: mapboxgl.Map) {
       ["==", ["get", "active"], true],
     ],
     paint: {
-      "line-color": "#fb923c",
+      "line-color": "#ad7c4d",
       "line-width": 6,
       "line-dasharray": [2, 1],
     },
@@ -215,8 +215,8 @@ function addLayers(m: mapboxgl.Map) {
     source: "hazards",
     layout: { "text-field": ["get", "id"], "text-size": 11 },
     paint: {
-      "text-color": "#93c5fd",
-      "text-halo-color": "#020617",
+      "text-color": "#496879",
+      "text-halo-color": "#faf9f5",
       "text-halo-width": 2,
     },
   });
@@ -225,7 +225,7 @@ function addLayers(m: mapboxgl.Map) {
     type: "line",
     source: "previous-routes",
     paint: {
-      "line-color": "#f87171",
+      "line-color": "#aa5649",
       "line-width": 3,
       "line-dasharray": [2, 2],
       "line-opacity": ["get", "opacity"],
@@ -241,8 +241,8 @@ function addLayers(m: mapboxgl.Map) {
       "line-color": [
         "case",
         ["==", ["get", "status"], "REROUTING"],
-        "#fbbf24",
-        "#34d399",
+        "#a17c35",
+        "#4f7056",
       ],
       "line-width": ["case", ["get", "selected"], 7, 4],
       "line-opacity": ["case", ["get", "selected"], 1, 0.65],
@@ -258,7 +258,7 @@ function addLayers(m: mapboxgl.Map) {
       ["literal", ["AWAITING_APPROVAL", "PROPOSED"]],
     ],
     paint: {
-      "line-color": "#94a3b8",
+      "line-color": "#878e80",
       "line-width": ["case", ["get", "selected"], 5, 3],
       "line-dasharray": [3, 2],
     },
@@ -270,7 +270,7 @@ function addLayers(m: mapboxgl.Map) {
     filter: ["any", ["get", "selected"], ["get", "review"]],
     paint: {
       "circle-radius": 16,
-      "circle-color": "#020617",
+      "circle-color": "#faf9f5",
       "circle-opacity": 0.35,
       "circle-stroke-color": ["get", "color"],
       "circle-stroke-width": 2,
@@ -283,7 +283,7 @@ function addLayers(m: mapboxgl.Map) {
     paint: {
       "circle-radius": ["case", ["get", "selected"], 11, 8],
       "circle-color": ["get", "color"],
-      "circle-stroke-color": "#020617",
+      "circle-stroke-color": "#faf9f5",
       "circle-stroke-width": 2,
     },
   });
@@ -297,8 +297,8 @@ function addLayers(m: mapboxgl.Map) {
       "text-offset": [0, 1.7],
     },
     paint: {
-      "text-color": "#e2e8f0",
-      "text-halo-color": "#020617",
+      "text-color": "#394136",
+      "text-halo-color": "#faf9f5",
       "text-halo-width": 2,
     },
   });
@@ -312,14 +312,14 @@ function addLayers(m: mapboxgl.Map) {
         "match",
         ["get", "status"],
         "idle",
-        "#38bdf8",
+        "#648497",
         "en_route",
-        "#34d399",
+        "#4f7056",
         "on_scene",
-        "#a78bfa",
-        "#64748b",
+        "#88718c",
+        "#91988b",
       ],
-      "circle-stroke-color": "#020617",
+      "circle-stroke-color": "#faf9f5",
       "circle-stroke-width": 2,
     },
   });
@@ -333,8 +333,8 @@ function addLayers(m: mapboxgl.Map) {
       "text-offset": [0, 1.5],
     },
     paint: {
-      "text-color": "#bae6fd",
-      "text-halo-color": "#020617",
+      "text-color": "#526a76",
+      "text-halo-color": "#faf9f5",
       "text-halo-width": 2,
     },
   });
@@ -376,7 +376,7 @@ export default function MapView({
       m = new mapboxgl.Map({
         container: container.current,
         accessToken: token,
-        style: "mapbox://styles/mapbox/dark-v11",
+        style: "mapbox://styles/mapbox/light-v11",
         center: [91.765, 26.165],
         zoom: 12.6,
         attributionControl: false,
@@ -758,21 +758,21 @@ function CoordinateMap({
           <path
             d="M 50 0 L 0 0 0 50"
             fill="none"
-            stroke="#1e293b"
+            stroke="#dce0d5"
             strokeWidth="1"
           />
         </pattern>
       </defs>
-      <rect width="1000" height="800" fill="#07111f" />
+      <rect width="1000" height="800" fill="#edf0e7" />
       <rect width="1000" height="800" fill="url(#map-grid)" />
       <path
         d="M0 45 C220 130 310 20 540 68 S810 145 1000 30 L1000 0 L0 0Z"
-        fill="#102e4c"
+        fill="#dbe6e8"
       />
-      <text x="400" y="50" fill="#60a5fa" fontSize="16" letterSpacing="5">
+      <text x="400" y="50" fill="#557385" fontSize="16" letterSpacing="5">
         BRAHMAPUTRA
       </text>
-      <text x="330" y="420" fill="#334155" fontSize="30" letterSpacing="10">
+      <text x="330" y="420" fill="#bbc1b4" fontSize="30" letterSpacing="10">
         GUWAHATI
       </text>
       {state?.hazards.map((h) => (
@@ -794,9 +794,9 @@ function CoordinateMap({
           {h.geometry.type === "Polygon" ? (
             <polygon
               points={points(h.geometry.coordinates[0])}
-              fill={h.active ? "#2563eb" : "transparent"}
+              fill={h.active ? "#72909f" : "transparent"}
               fillOpacity="0.28"
-              stroke={h.active ? "#60a5fa" : "#94a3b8"}
+              stroke={h.active ? "#557385" : "#878e80"}
               strokeWidth="3"
               strokeDasharray={h.active ? undefined : "8 6"}
             />
@@ -804,7 +804,7 @@ function CoordinateMap({
             <polyline
               points={points(h.geometry.coordinates)}
               fill="none"
-              stroke="#fb923c"
+              stroke="#ad7c4d"
               opacity={h.active ? 1 : 0.3}
               strokeWidth="7"
               strokeDasharray="8 5"
@@ -825,7 +825,7 @@ function CoordinateMap({
                   : h.geometry.coordinates[0],
               )[1] - 12
             }
-            fill="#93c5fd"
+            fill="#496879"
             fontSize="15"
           >
             {h.id}
@@ -837,7 +837,7 @@ function CoordinateMap({
           {a.previous_route_geometry && (
             <polyline
               points={points(a.previous_route_geometry.coordinates)}
-              stroke="#f87171"
+              stroke="#aa5649"
               fill="none"
               strokeWidth="4"
               strokeDasharray="8 6"
@@ -854,10 +854,10 @@ function CoordinateMap({
               fill="none"
               stroke={
                 a.status === "REROUTING"
-                  ? "#fbbf24"
+                  ? "#a17c35"
                   : a.status === "ACTIVE"
-                    ? "#34d399"
-                    : "#94a3b8"
+                    ? "#4f7056"
+                    : "#878e80"
               }
               strokeWidth={a.report_id === selected ? 7 : 4}
               opacity={a.report_id === selected ? 1 : 0.65}
@@ -893,17 +893,17 @@ function CoordinateMap({
               r="8"
               fill={
                 v.status === "idle"
-                  ? "#38bdf8"
+                  ? "#648497"
                   : v.status === "en_route"
-                    ? "#34d399"
+                    ? "#4f7056"
                     : v.status === "on_scene"
-                      ? "#a78bfa"
-                      : "#64748b"
+                      ? "#88718c"
+                      : "#91988b"
               }
-              stroke="#020617"
+              stroke="#faf9f5"
               strokeWidth="2"
             />
-            <text x={x + 12} y={y + 5} fill="#bae6fd" fontSize="14">
+            <text x={x + 12} y={y + 5} fill="#526a76" fontSize="14">
               {v.id}
             </text>
           </g>
@@ -938,7 +938,7 @@ function CoordinateMap({
                   cx={x}
                   cy={y}
                   r="19"
-                  stroke="#e2e8f0"
+                  stroke="#394136"
                   fill="none"
                   strokeWidth="2"
                 />
@@ -948,14 +948,14 @@ function CoordinateMap({
                 cy={y}
                 r="11"
                 fill={reportColor(r.workflow_status, r.priority_score)}
-                stroke="#020617"
+                stroke="#faf9f5"
                 strokeWidth="2"
               />
               <text
                 x={x}
                 y={y + 28}
                 textAnchor="middle"
-                fill="#e2e8f0"
+                fill="#394136"
                 fontSize="14"
               >
                 {r.workflow_status === "NEEDS_REVIEW" ? "? " : ""}
