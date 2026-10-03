@@ -84,6 +84,14 @@ async def test_full_flood_demo(client):
     assert a_rescue["route_eta_seconds"] > eta_before
     assert s["system"]["scenario_status"] == "done"
 
+    sheet = (await client.get(f"/api/reports/{med['id']}/nuroen-export")).json()
+    by_node = {n["node"]: n for n in sheet["nodes"]}
+    assert by_node["N6"]["payload"]["policy_rule"] == "GOV-01"
+    assert by_node["N8"]["payload"]["status"] == "APPROVED"
+    assert {"id": "V-02", "reason": "Medical certification missing"} in by_node["N9"]["payload"]["rejected"]
+    text = (await client.get(f"/api/reports/{med['id']}/nuroen-export?format=text")).text
+    assert "[N8] Approval Gate: Dispatcher" in text
+
     audit = (await client.get(f"/api/audit/{rescue['id']}")).json()
     kinds = [e["event_type"] for e in audit]
     for k in (

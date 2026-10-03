@@ -3,6 +3,7 @@
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
@@ -39,7 +40,7 @@ from app.schemas import (
     SystemStats,
     VolunteerOut,
 )
-from app.services import audit, reroute, workflow
+from app.services import audit, nuroen_export, reroute, workflow
 from app.services.seed import reset_operational_state
 from app.services.uow import unit_of_work
 from app.services.workflow import WorkflowError
@@ -99,6 +100,15 @@ async def list_reports(session: AsyncSession = Depends(get_session)):
 @router.get("/reports/{report_id}", response_model=ReportOut)
 async def get_report(report_id: str, session: AsyncSession = Depends(get_session)):
     return await workflow.get_report(session, report_id)
+
+
+@router.get("/reports/{report_id}/nuroen-export")
+async def nuroen_run_sheet(
+    report_id: str, format: str = "json", session: AsyncSession = Depends(get_session)
+):
+    """Node-by-node payloads (N1…N11) for mirroring this incident's run into the Nuroen workflow."""
+    sheet = await nuroen_export.run_sheet(session, report_id)
+    return PlainTextResponse(sheet["text"]) if format == "text" else sheet
 
 
 @router.post("/reports/{report_id}/process-locally")
