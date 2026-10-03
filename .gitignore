@@ -6,11 +6,13 @@
 nuroendocs.txt
 *.notes.txt
 .claude/
+docs/
 
 # ---------- env ----------
 .env
 .env.*
 !.env.example
+!frontend/.env.production
 
 # ---------- python ----------
 __pycache__/
