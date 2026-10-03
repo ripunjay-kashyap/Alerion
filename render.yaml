@@ -19,10 +19,6 @@ services:
       - key: TOOLS_API_KEY
         generateValue: true
       - key: ORCHESTRATION_MODE
-        value: auto
-      - key: NUROEN_TRIGGER_URL
-        sync: false
-      - key: NUROEN_API_KEY
-        sync: false
+        value: local
       - key: CORS_ORIGINS
         sync: false

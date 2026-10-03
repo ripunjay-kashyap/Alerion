@@ -55,6 +55,15 @@ class ReportStatus(StrEnum):
     COMPLETED = "COMPLETED"
     REJECTED = "REJECTED"
     FAILED = "FAILED"
+    MERGED = "MERGED"  # duplicate folded into another report (cost guard: no agent run)
+
+
+TERMINAL_REPORT_STATUSES = {
+    ReportStatus.COMPLETED,
+    ReportStatus.REJECTED,
+    ReportStatus.FAILED,
+    ReportStatus.MERGED,
+}
 
 
 class AssignmentStatus(StrEnum):
@@ -65,6 +74,14 @@ class AssignmentStatus(StrEnum):
     COMPLETED = "COMPLETED"
     CANCELLED = "CANCELLED"
     FAILED = "FAILED"
+
+
+OPEN_ASSIGNMENT_STATUSES = {
+    AssignmentStatus.PROPOSED,
+    AssignmentStatus.AWAITING_APPROVAL,
+    AssignmentStatus.ACTIVE,
+    AssignmentStatus.REROUTING,
+}
 
 
 class ApprovalStatus(StrEnum):
@@ -101,9 +118,7 @@ class Orchestrator(StrEnum):
 
 class TimestampMixin:
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
 
 
 class Report(TimestampMixin, Base):
@@ -144,6 +159,8 @@ class Report(TimestampMixin, Base):
     orchestrator: Mapped[str | None] = mapped_column(String(16))
     lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     scenario_run_id: Mapped[str | None] = mapped_column(String(32))
+    merged_into: Mapped[str | None] = mapped_column(String(16), index=True)
+    duplicate_count: Mapped[int] = mapped_column(Integer, default=0)
 
 
 class Volunteer(TimestampMixin, Base):
@@ -204,9 +221,7 @@ class Approval(Base):
 
     id: Mapped[str] = mapped_column(String(16), primary_key=True, default=lambda: new_id("APR"))
     report_id: Mapped[str] = mapped_column(ForeignKey("reports.id", ondelete="CASCADE"), index=True)
-    assignment_id: Mapped[str | None] = mapped_column(
-        ForeignKey("assignments.id", ondelete="CASCADE")
-    )
+    assignment_id: Mapped[str | None] = mapped_column(ForeignKey("assignments.id", ondelete="CASCADE"))
     action_type: Mapped[str] = mapped_column(String(16))
     reason: Mapped[str] = mapped_column(Text)
     policy_rule: Mapped[str | None] = mapped_column(String(16))
@@ -246,6 +261,4 @@ class SystemState(Base):
     nuroen_status: Mapped[str] = mapped_column(String(16), default="unknown")  # ok|degraded|unknown
     scenario_status: Mapped[str] = mapped_column(String(16), default="idle")  # idle|running|done
     scenario_run_id: Mapped[str | None] = mapped_column(String(32))
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=utcnow, onupdate=utcnow
-    )
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

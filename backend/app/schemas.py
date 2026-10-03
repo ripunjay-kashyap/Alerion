@@ -1,7 +1,7 @@
 """Pydantic I/O models for the product API. Tool-specific models live in app/tools."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -38,6 +38,8 @@ class ReportOut(ORM):
     policy_reason: str | None
     workflow_status: str
     orchestrator: str | None
+    merged_into: str | None
+    duplicate_count: int
     created_at: datetime
     updated_at: datetime
 
@@ -117,12 +119,20 @@ class AuditOut(ORM):
     created_at: datetime
 
 
+class SystemStats(BaseModel):
+    reports_received: int = 0
+    duplicates_merged: int = 0
+    nuroen_processed: int = 0
+    local_processed: int = 0
+    fallbacks: int = 0
+
+
 class SystemOut(ORM):
     orchestration_mode: str
     nuroen_status: str
     scenario_status: str
     scenario_run_id: str | None
-    nuroen_configured: bool = False
+    stats: SystemStats = SystemStats()
 
 
 class StateOut(BaseModel):
@@ -141,3 +151,77 @@ class ReportIn(BaseModel):
     text: str = Field(min_length=3, max_length=2000)
     source: SourceType = SourceType.CITIZEN
     source_identifier: str | None = None
+
+
+# ---------- workflow inputs (shared by Nuroen tools and the local orchestrator) ----------
+
+NeedLiteral = Literal["rescue", "medical", "food"]
+
+
+class IntakeData(BaseModel):
+    """Structured extraction of a raw report. Never invent missing facts: use null + ambiguities."""
+
+    need_type: NeedLiteral | None = Field(None, description="rescue | medical | food; null if unclear")
+    location_text: str | None = Field(
+        None, description="Place exactly as mentioned, e.g. 'Riverside Apartments'"
+    )
+    people_affected: int | None = Field(None, ge=0, description="Number of people; null if not stated")
+    urgency_clues: list[str] = Field(default_factory=list, description="Short phrases, e.g. 'water rising'")
+    medical_context: str | None = Field(None, description="Medical indicators, e.g. 'insulin dependency'")
+    confidence: float = Field(ge=0, le=1, description="Overall extraction confidence 0..1")
+    ambiguities: list[str] = Field(default_factory=list, description="What is unclear or missing")
+
+
+class TriageData(BaseModel):
+    """Semantic urgency evidence. Does NOT decide priority; the backend scores deterministically."""
+
+    life_safety: bool = Field(description="True if anyone's life may be at immediate risk")
+    vulnerabilities: list[Literal["elderly", "child", "pregnant", "disabled", "medical_dependency"]] = Field(
+        default_factory=list
+    )
+    escalation_signals: list[str] = Field(
+        default_factory=list, description="e.g. 'water rising', 'getting worse'"
+    )
+    rationale: str = Field(default="", max_length=500, description="One or two sentences")
+
+
+class ApprovalResolveIn(BaseModel):
+    note: str | None = None
+    corrections: "ReviewCorrections | None" = None
+
+
+class ReviewCorrections(BaseModel):
+    location_text: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    need_type: NeedLiteral | None = None
+    people_affected: int | None = None
+
+
+class ApprovalRejectIn(BaseModel):
+    note: str | None = None
+
+
+class HazardIn(BaseModel):
+    label: str = Field(min_length=1, max_length=128)
+    kind: Literal["flood_zone", "blocked_road"] = "flood_zone"
+    geometry: dict[str, Any]
+
+
+class ModeIn(BaseModel):
+    mode: Literal["local", "nuroen"]
+
+
+class ScenarioStartIn(BaseModel):
+    scenario_id: str = "flood_demo"
+    mode: Literal["timed", "manual"] = "timed"
+
+
+class ScenarioStatusOut(BaseModel):
+    status: str
+    scenario_id: str | None
+    mode: str
+    next_event_index: int
+    total_events: int
+    elapsed_s: float
+    events: list[dict[str, Any]]

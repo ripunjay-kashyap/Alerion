@@ -55,7 +55,7 @@ rules:
     reason: "Life-safety dispatch from an unverified source requires dispatcher authorization."
   - id: GOV-02
     outcome: AUTO_DISPATCH
-    reason: "Official source — auto-processing permitted."
+    reason: "Verified source (trust >= 0.80) — auto-dispatch permitted."
   - id: GOV-03
     outcome: AUTO_DISPATCH
     reason: "Non-life-safety request with acceptable trust — auto-dispatch permitted."

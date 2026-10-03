@@ -1,14 +1,18 @@
 {
-  "_note": "Known places → fixed coordinates for deterministic replay. Keys are lowercase aliases.",
+  "_note": "Known places -> fixed coordinates for deterministic replay (checked against Mapbox). Aliases are lowercase. incident_zone=true gives a +0.10 trust modifier.",
+  "bbox": [91.60, 26.05, 91.90, 26.25],
   "places": [
-    {"name": "Riverside Apartments, Uzan Bazaar", "aliases": ["riverside apartments", "riverside", "uzan bazaar"], "lng": 91.7530, "lat": 26.1890, "incident_zone": true},
-    {"name": "Central Market, Fancy Bazaar", "aliases": ["central market", "fancy bazaar"], "lng": 91.7398, "lat": 26.1823, "incident_zone": true},
-    {"name": "Station Road, Paltan Bazaar", "aliases": ["station road", "paltan bazaar", "railway station"], "lng": 91.7518, "lat": 26.1792, "incident_zone": false},
-    {"name": "Market Road, Pan Bazaar", "aliases": ["market road", "pan bazaar"], "lng": 91.7445, "lat": 26.1860, "incident_zone": false},
-    {"name": "Anil Nagar", "aliases": ["anil nagar", "nabin nagar"], "lng": 91.7660, "lat": 26.1645, "incident_zone": true},
-    {"name": "Zoo Road", "aliases": ["zoo road", "zoo road tiniali"], "lng": 91.7790, "lat": 26.1660, "incident_zone": true},
-    {"name": "Ganeshguri", "aliases": ["ganeshguri"], "lng": 91.7856, "lat": 26.1488, "incident_zone": false},
-    {"name": "Chandmari", "aliases": ["chandmari"], "lng": 91.7752, "lat": 26.1838, "incident_zone": false},
-    {"name": "Ulubari", "aliases": ["ulubari"], "lng": 91.7535, "lat": 26.1720, "incident_zone": false}
+    {"name": "Riverside Apartments, Uzan Bazar", "aliases": ["riverside apartments", "riverside", "uzan bazar", "uzan bazaar"], "lng": 91.7540, "lat": 26.1870, "incident_zone": true},
+    {"name": "Central Market, Fancy Bazaar", "aliases": ["central market", "fancy bazaar", "fancy bazar"], "lng": 91.7402, "lat": 26.1785, "incident_zone": false},
+    {"name": "Station Road, Paltan Bazaar", "aliases": ["station road", "paltan bazaar", "paltan bazar", "railway station"], "lng": 91.7515, "lat": 26.1790, "incident_zone": false},
+    {"name": "Market Road, Pan Bazaar", "aliases": ["market road", "pan bazaar", "pan bazar"], "lng": 91.7469, "lat": 26.1843, "incident_zone": false},
+    {"name": "Lachit Nagar", "aliases": ["lachit nagar", "lachit"], "lng": 91.7613, "lat": 26.1716, "incident_zone": true},
+    {"name": "Silpukhuri", "aliases": ["silpukhuri", "silpukhur"], "lng": 91.7663, "lat": 26.1920, "incident_zone": false},
+    {"name": "Chandmari", "aliases": ["chandmari"], "lng": 91.7749, "lat": 26.1835, "incident_zone": false},
+    {"name": "Ulubari", "aliases": ["ulubari"], "lng": 91.7575, "lat": 26.1749, "incident_zone": false},
+    {"name": "Bhangagarh", "aliases": ["bhangagarh", "gmch"], "lng": 91.7689, "lat": 26.1647, "incident_zone": false},
+    {"name": "Ganeshguri", "aliases": ["ganeshguri"], "lng": 91.7853, "lat": 26.1499, "incident_zone": false},
+    {"name": "Machkhowa", "aliases": ["machkhowa"], "lng": 91.7360, "lat": 26.1748, "incident_zone": true},
+    {"name": "Bharalumukh", "aliases": ["bharalumukh"], "lng": 91.7303, "lat": 26.1729, "incident_zone": true}
   ]
 }

@@ -14,41 +14,55 @@ def _load_json(name: str) -> dict | list:
 
 
 async def seed_reference_data(session: AsyncSession) -> None:
-    """Upsert volunteers + hazards from seed files; ensure system_state row exists."""
+    """Upsert static volunteer/hazard attributes from seed files; ensure system_state row exists.
+
+    Runtime state (positions, availability, hazard activation) is only restored by reset.
+    """
     for v in _load_json("volunteers.json"):
-        existing = await session.get(Volunteer, v["id"])
-        fields = {
-            **v,
+        static = {
+            "name": v["name"],
+            "callsign": v["callsign"],
+            "skills": v["skills"],
+            "medical_certified": v["medical_certified"],
+            "vehicle_type": v["vehicle_type"],
+            "capacity": v["capacity"],
             "home_latitude": v["latitude"],
             "home_longitude": v["longitude"],
             "home_available": v["available"],
-            "status": "idle" if v["available"] else "offline",
         }
+        existing = await session.get(Volunteer, v["id"])
         if existing is None:
-            session.add(Volunteer(**fields))
-        else:
-            for k, val in fields.items():
+            session.add(
+                Volunteer(
+                    id=v["id"],
+                    latitude=v["latitude"],
+                    longitude=v["longitude"],
+                    available=v["available"],
+                    status="idle" if v["available"] else "offline",
+                    **static,
+                )
+            )
+        else:  # static attributes only — never clobber live position/status on restart
+            for k, val in static.items():
                 setattr(existing, k, val)
 
     for f in _load_json("hazards.geojson")["features"]:
         p = f["properties"]
-        existing = await session.get(Hazard, p["id"])
-        fields = {
-            "id": p["id"],
+        static = {
             "kind": p["kind"],
             "type": p["type"],
             "label": p["label"],
             "severity": p["severity"],
-            "active": p["active"],
             "initially_active": p["active"],
             "detour_waypoints": p.get("detour_waypoints", []),
             "geometry": f["geometry"],
             "source": "seed",
         }
+        existing = await session.get(Hazard, p["id"])
         if existing is None:
-            session.add(Hazard(**fields))
-        else:
-            for k, val in fields.items():
+            session.add(Hazard(id=p["id"], active=p["active"], **static))
+        else:  # keep live `active` flag across restarts
+            for k, val in static.items():
                 setattr(existing, k, val)
 
     if await session.get(SystemState, 1) is None:

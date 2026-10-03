@@ -1,38 +1,91 @@
 [
-  {
-    "id": "V-01", "name": "Bikash Das", "callsign": "BOAT-ALPHA",
-    "latitude": 26.1795, "longitude": 91.7350,
-    "available": true, "skills": ["rescue", "swimming"], "medical_certified": false,
-    "vehicle_type": "boat", "capacity": 6
-  },
-  {
-    "id": "V-02", "name": "Rituraj Bora", "callsign": "RESCUE-2",
-    "latitude": 26.1720, "longitude": 91.7535,
-    "available": true, "skills": ["rescue", "first_aid"], "medical_certified": false,
-    "vehicle_type": "4x4", "capacity": 4
-  },
-  {
-    "id": "V-03", "name": "Dr. Ananya Sharma", "callsign": "MEDIC-3",
-    "latitude": 26.1838, "longitude": 91.7752,
-    "available": false, "skills": ["medical", "first_aid"], "medical_certified": true,
-    "vehicle_type": "car", "capacity": 2
-  },
-  {
-    "id": "V-04", "name": "Pranjal Kalita", "callsign": "RESCUE-4",
-    "latitude": 26.1488, "longitude": 91.7856,
-    "available": true, "skills": ["rescue"], "medical_certified": false,
-    "vehicle_type": "4x4", "capacity": 5
-  },
-  {
-    "id": "V-05", "name": "Nurse Mousumi Deka", "callsign": "MEDIC-5",
-    "latitude": 26.1550, "longitude": 91.7690,
-    "available": true, "skills": ["medical", "first_aid"], "medical_certified": true,
-    "vehicle_type": "car", "capacity": 2
-  },
-  {
-    "id": "V-06", "name": "Hemanta Nath", "callsign": "SUPPLY-6",
-    "latitude": 26.1255, "longitude": 91.7960,
-    "available": true, "skills": ["logistics"], "medical_certified": false,
-    "vehicle_type": "truck", "capacity": 20
-  }
+ {
+  "id": "V-01",
+  "name": "Bikash Das",
+  "callsign": "BOAT-ALPHA",
+  "latitude": 26.1729,
+  "longitude": 91.7303,
+  "available": true,
+  "skills": [
+   "rescue",
+   "swimming"
+  ],
+  "medical_certified": false,
+  "vehicle_type": "boat",
+  "capacity": 6
+ },
+ {
+  "id": "V-02",
+  "name": "Rituraj Bora",
+  "callsign": "RESCUE-2",
+  "latitude": 26.1359,
+  "longitude": 91.8059,
+  "available": true,
+  "skills": [
+   "rescue",
+   "medical",
+   "first_aid"
+  ],
+  "medical_certified": false,
+  "vehicle_type": "4x4",
+  "capacity": 4
+ },
+ {
+  "id": "V-03",
+  "name": "Dr. Ananya Sharma",
+  "callsign": "MEDIC-3",
+  "latitude": 26.1749,
+  "longitude": 91.7575,
+  "available": false,
+  "skills": [
+   "medical",
+   "first_aid"
+  ],
+  "medical_certified": true,
+  "vehicle_type": "car",
+  "capacity": 2
+ },
+ {
+  "id": "V-04",
+  "name": "Pranjal Kalita",
+  "callsign": "RESCUE-4",
+  "latitude": 26.1835,
+  "longitude": 91.7749,
+  "available": true,
+  "skills": [
+   "rescue"
+  ],
+  "medical_certified": false,
+  "vehicle_type": "4x4",
+  "capacity": 5
+ },
+ {
+  "id": "V-05",
+  "name": "Nurse Mousumi Deka",
+  "callsign": "MEDIC-5",
+  "latitude": 26.1647,
+  "longitude": 91.7689,
+  "available": true,
+  "skills": [
+   "medical",
+   "first_aid"
+  ],
+  "medical_certified": true,
+  "vehicle_type": "car",
+  "capacity": 2
+ },
+ {
+  "id": "V-06",
+  "name": "Hemanta Nath",
+  "callsign": "SUPPLY-6",
+  "latitude": 26.1234,
+  "longitude": 91.7989,
+  "available": true,
+  "skills": [
+   "logistics"
+  ],
+  "medical_certified": false,
+  "vehicle_type": "truck",
+  "capacity": 20
+ }
 ]
