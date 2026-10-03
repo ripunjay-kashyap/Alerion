@@ -1,0 +1,11 @@
+{
+  "id": "flood_demo",
+  "title": "Guwahati monsoon flood — Brahmaputra / Bharalu",
+  "events": [
+    {"at_seconds": 0, "type": "report", "payload": {"text": "Family trapped near Riverside Apartments, ground floor flooding quickly.", "source": "official", "source_identifier": "SDRF-Control"}},
+    {"at_seconds": 8, "type": "report", "payload": {"text": "Person unconscious near Central Market.", "source": "citizen", "source_identifier": "+91-98xxxxxx12"}},
+    {"at_seconds": 18, "type": "report", "payload": {"text": "Need drinking water for 15 people near Station Road.", "source": "citizen", "source_identifier": "+91-97xxxxxx40"}},
+    {"at_seconds": 24, "type": "report", "payload": {"text": "help water everywhere pls", "source": "anonymous", "source_identifier": null}},
+    {"at_seconds": 35, "type": "hazard", "payload": {"hazard_id": "HZ-02", "active": true}}
+  ]
+}

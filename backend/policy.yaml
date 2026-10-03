@@ -1,0 +1,64 @@
+# Deterministic governance rules. Evaluated by app/services/policy.py.
+# Rule ids are recorded on reports, approvals and audit entries.
+
+trust:
+  base:
+    official: 1.00
+    verified_operator: 0.90
+    citizen: 0.55
+    anonymous: 0.40
+  modifiers:
+    corroborated: 0.15           # another report within corroboration radius/window, different source
+    in_known_incident_zone: 0.10
+    low_location_confidence: -0.15
+  corroboration_radius_m: 500
+  corroboration_window_min: 30
+  verified_threshold: 0.80
+  unverified_threshold: 0.50
+
+uncertainty:
+  minimum_incident_confidence: 0.65
+  minimum_location_confidence: 0.70
+
+dispatch:
+  life_safety_min_trust_for_auto: 0.80
+
+volunteers:
+  required_skill:
+    rescue: rescue
+    medical: medical
+    food: logistics
+  medical_requires_certification: true
+  rescue_vehicles: [boat, 4x4]
+  supply_vehicles: [truck, car, 4x4]
+  route_candidates: 3            # top-N by straight-line distance get a real route
+
+routing:
+  forbid_active_hazard_zones: true
+  forbid_blocked_roads: true
+  blocked_road_buffer_m: 15
+
+priority:
+  severity_base: {medical: 40, rescue: 35, food: 20}
+  life_safety_bonus: 10
+  wait_points_per_minute: 2
+  vulnerability_points: 5
+  large_group_threshold: 10
+  hazard_proximity_m: 300
+
+rules:
+  - id: UNC-01
+    outcome: NEEDS_REVIEW
+    reason: "Low-confidence extraction or unresolved location — human review required before any dispatch."
+  - id: GOV-01
+    outcome: APPROVAL_REQUIRED
+    reason: "Life-safety dispatch from an unverified source requires dispatcher authorization."
+  - id: GOV-02
+    outcome: AUTO_DISPATCH
+    reason: "Official source — auto-processing permitted."
+  - id: GOV-03
+    outcome: AUTO_DISPATCH
+    reason: "Non-life-safety request with acceptable trust — auto-dispatch permitted."
+  - id: GOV-99
+    outcome: APPROVAL_REQUIRED
+    reason: "No auto-dispatch rule matched — default to human approval (safe by default)."

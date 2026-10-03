@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: alerion-backend
+    runtime: python
+    rootDir: backend
+    plan: starter            # avoid free-tier cold starts during judging
+    buildCommand: pip install uv && uv sync --frozen --no-dev
+    startCommand: uv run --no-dev uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.13
+      - key: DATABASE_URL
+        sync: false
+      - key: MAPBOX_TOKEN
+        sync: false
+      - key: MAPBOX_MODE
+        value: cache_first
+      - key: TOOLS_API_KEY
+        generateValue: true
+      - key: ORCHESTRATION_MODE
+        value: auto
+      - key: NUROEN_TRIGGER_URL
+        sync: false
+      - key: NUROEN_API_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false

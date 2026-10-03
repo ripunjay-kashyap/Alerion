@@ -1,0 +1,14 @@
+{
+  "_note": "Known places → fixed coordinates for deterministic replay. Keys are lowercase aliases.",
+  "places": [
+    {"name": "Riverside Apartments, Uzan Bazaar", "aliases": ["riverside apartments", "riverside", "uzan bazaar"], "lng": 91.7530, "lat": 26.1890, "incident_zone": true},
+    {"name": "Central Market, Fancy Bazaar", "aliases": ["central market", "fancy bazaar"], "lng": 91.7398, "lat": 26.1823, "incident_zone": true},
+    {"name": "Station Road, Paltan Bazaar", "aliases": ["station road", "paltan bazaar", "railway station"], "lng": 91.7518, "lat": 26.1792, "incident_zone": false},
+    {"name": "Market Road, Pan Bazaar", "aliases": ["market road", "pan bazaar"], "lng": 91.7445, "lat": 26.1860, "incident_zone": false},
+    {"name": "Anil Nagar", "aliases": ["anil nagar", "nabin nagar"], "lng": 91.7660, "lat": 26.1645, "incident_zone": true},
+    {"name": "Zoo Road", "aliases": ["zoo road", "zoo road tiniali"], "lng": 91.7790, "lat": 26.1660, "incident_zone": true},
+    {"name": "Ganeshguri", "aliases": ["ganeshguri"], "lng": 91.7856, "lat": 26.1488, "incident_zone": false},
+    {"name": "Chandmari", "aliases": ["chandmari"], "lng": 91.7752, "lat": 26.1838, "incident_zone": false},
+    {"name": "Ulubari", "aliases": ["ulubari"], "lng": 91.7535, "lat": 26.1720, "incident_zone": false}
+  ]
+}

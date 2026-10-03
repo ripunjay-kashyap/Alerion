@@ -1,0 +1,55 @@
+{
+  "_note": "Exact-match fallback extraction for scenario reports (used only when Nuroen is unavailable). Keyed by normalized text.",
+  "fixtures": {
+    "family trapped near riverside apartments, ground floor flooding quickly.": {
+      "need_type": "rescue",
+      "location_text": "Riverside Apartments",
+      "people_affected": 4,
+      "urgency_clues": ["trapped", "flooding quickly"],
+      "medical_context": null,
+      "confidence": 0.92,
+      "ambiguities": ["exact family size unknown"],
+      "triage": {"life_safety": true, "vulnerabilities": ["child"], "escalation_signals": ["water rising"], "rationale": "Family trapped on ground floor with rapidly rising water."}
+    },
+    "person unconscious near central market.": {
+      "need_type": "medical",
+      "location_text": "Central Market",
+      "people_affected": 1,
+      "urgency_clues": ["unconscious"],
+      "medical_context": "unconscious person",
+      "confidence": 0.84,
+      "ambiguities": ["cause of unconsciousness unknown"],
+      "triage": {"life_safety": true, "vulnerabilities": [], "escalation_signals": [], "rationale": "Unconscious person indicates possible life-threatening condition."}
+    },
+    "need drinking water for 15 people near station road.": {
+      "need_type": "food",
+      "location_text": "Station Road",
+      "people_affected": 15,
+      "urgency_clues": ["drinking water"],
+      "medical_context": null,
+      "confidence": 0.9,
+      "ambiguities": [],
+      "triage": {"life_safety": false, "vulnerabilities": [], "escalation_signals": [], "rationale": "Supply request for a group; not immediately life-threatening."}
+    },
+    "help water everywhere pls": {
+      "need_type": "rescue",
+      "location_text": null,
+      "people_affected": null,
+      "urgency_clues": ["water everywhere"],
+      "medical_context": null,
+      "confidence": 0.35,
+      "ambiguities": ["no location", "unknown number of people", "unclear need"],
+      "triage": {"life_safety": false, "vulnerabilities": [], "escalation_signals": ["water rising"], "rationale": "Insufficient information to assess."}
+    },
+    "old couple stuck near market road, water is rising and one person needs insulin.": {
+      "need_type": "medical",
+      "location_text": "Market Road",
+      "people_affected": 2,
+      "urgency_clues": ["water rising", "insulin dependency"],
+      "medical_context": "insulin dependency",
+      "confidence": 0.87,
+      "ambiguities": [],
+      "triage": {"life_safety": true, "vulnerabilities": ["elderly", "medical_dependency"], "escalation_signals": ["water rising"], "rationale": "Elderly couple, insulin-dependent, rising water."}
+    }
+  }
+}

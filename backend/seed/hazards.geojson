@@ -1,0 +1,42 @@
+{
+  "type": "FeatureCollection",
+  "_note": "Geometry is approximate; tuned in Phase 1 so HZ-02 cuts V-04's first route to Riverside Apartments.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "HZ-01", "kind": "flood_zone", "type": "flood",
+        "label": "Anil Nagar – Nabin Nagar waterlogging", "severity": "high",
+        "active": true, "detour_waypoints": []
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[91.7620, 26.1610], [91.7700, 26.1610], [91.7700, 26.1680], [91.7620, 26.1680], [91.7620, 26.1610]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "HZ-02", "kind": "flood_zone", "type": "flood",
+        "label": "Zoo Road corridor flash flood", "severity": "critical",
+        "active": false, "detour_waypoints": [[91.7720, 26.1520]]
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[91.7740, 26.1620], [91.7840, 26.1620], [91.7840, 26.1700], [91.7740, 26.1700], [91.7740, 26.1620]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "BR-01", "kind": "blocked_road", "type": "debris",
+        "label": "A.T. Road blocked – fallen tree", "severity": "medium",
+        "active": true, "detour_waypoints": []
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[91.7420, 26.1835], [91.7455, 26.1838]]
+      }
+    }
+  ]
+}
