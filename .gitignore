@@ -11,7 +11,6 @@ docs/
 .env
 .env.*
 !.env.example
-!frontend/.env.production
 
 # ---------- python ----------
 __pycache__/
