@@ -7,7 +7,7 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 
 export const metadata: Metadata = {
   title: "Disaster Relief Router",
-  description: "Governed multi-agent disaster dispatch — Nuroen · FastAPI · Mapbox",
+  description: "Governed disaster dispatch for flood response — FastAPI · Mapbox",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

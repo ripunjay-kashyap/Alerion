@@ -1,4 +1,4 @@
-"""Deterministic fallback for the Intake + Triage agents (used when Nuroen is not processing).
+"""Deterministic intake + triage extraction for the report pipeline.
 
 1. Exact-match fixtures for scenario reports → reproducible demo.
 2. Keyword rules for anything else → conservative: low confidence when unsure, so UNC-01 sends it
@@ -147,6 +147,6 @@ def extract(raw_text: str) -> tuple[IntakeData, TriageData]:
         life_safety=life_safety,
         vulnerabilities=vulnerabilities,  # type: ignore[arg-type]
         escalation_signals=escalation,
-        rationale="Keyword-based fallback triage (Nuroen agents not used for this report).",
+        rationale="Keyword-based triage from the report text.",
     )
     return intake, triage

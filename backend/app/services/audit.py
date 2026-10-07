@@ -20,15 +20,10 @@ _PENDING = "pending_events"
 
 @dataclass
 class Actor:
-    """Who did something. `kind`: agent | human | system."""
+    """Who did something. `kind`: pipeline | human | system."""
 
     id: str
     kind: str
-    run_id: str | None = None
-
-    @property
-    def is_nuroen(self) -> bool:
-        return self.id.startswith("nuroen:")
 
 
 SYSTEM = Actor("system", "system")
@@ -38,13 +33,9 @@ SIMULATOR = Actor("simulator", "system")
 DISPATCHER = Actor("dispatcher", "human")
 
 
-def local(stage: str) -> Actor:
-    return Actor(f"local:{stage}", "agent")
-
-
-def nuroen(agent: str | None, run_id: str | None) -> Actor:
-    name = (agent or "coordinator").strip().lower().replace(" ", "-")
-    return Actor(f"nuroen:{name}", "agent", run_id)
+def stage(name: str) -> Actor:
+    """Pipeline stage actor: intake-stage, triage-stage, dispatch-stage."""
+    return Actor(f"{name}-stage", "pipeline")
 
 
 def emit(session: AsyncSession, name: str, **data: Any) -> None:
@@ -72,7 +63,6 @@ def record(
             event_type=event_type,
             actor_type=actor.kind,
             actor_id=actor.id,
-            run_id=actor.run_id,
             message=message,
             policy_rule=policy_rule,
             input_snapshot=input_snapshot,

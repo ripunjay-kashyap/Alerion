@@ -1,8 +1,13 @@
-"""End-to-end flood_demo in local mode, offline (Mapbox cache only)."""
+"""End-to-end flood_demo, offline (Mapbox cache only)."""
 
 import asyncio
 
-from tests.conftest import TOOL_HEADERS
+import pytest
+
+from app.services import audit, workflow
+from app.services.intake import extract
+from app.services.uow import unit_of_work
+from app.services.workflow import WorkflowError
 
 
 async def wait_for(client, pred, timeout=10.0):
@@ -47,7 +52,7 @@ async def test_full_flood_demo(client):
     cand = next(c for c in a_med["selection"]["candidates"] if c["volunteer_id"] == "V-05")
     assert cand["rejected_routes"] and cand["rejected_routes"][0]["hazard_id"] == "HZ-01"
 
-    # 3. duplicate → merged, no agent run
+    # 3. duplicate → merged, no pipeline run
     await client.post("/api/scenario/next")
     s = await wait_for(client, lambda s: any(r["workflow_status"] == "MERGED" for r in s["reports"]))
     dup = next(r for r in s["reports"] if r["workflow_status"] == "MERGED")
@@ -84,16 +89,8 @@ async def test_full_flood_demo(client):
     assert a_rescue["route_eta_seconds"] > eta_before
     assert s["system"]["scenario_status"] == "done"
 
-    sheet = (await client.get(f"/api/reports/{med['id']}/nuroen-export")).json()
-    by_node = {n["node"]: n for n in sheet["nodes"]}
-    assert by_node["N6"]["payload"]["policy_rule"] == "GOV-01"
-    assert by_node["N8"]["payload"]["status"] == "APPROVED"
-    assert {"id": "V-02", "reason": "Medical certification missing"} in by_node["N9"]["payload"]["rejected"]
-    text = (await client.get(f"/api/reports/{med['id']}/nuroen-export?format=text")).text
-    assert "[N8] Approval Gate: Dispatcher" in text
-
-    audit = (await client.get(f"/api/audit/{rescue['id']}")).json()
-    kinds = [e["event_type"] for e in audit]
+    trail = (await client.get(f"/api/audit/{rescue['id']}")).json()
+    kinds = [e["event_type"] for e in trail]
     for k in (
         "REPORT_RECEIVED",
         "INTAKE_STRUCTURED",
@@ -105,61 +102,27 @@ async def test_full_flood_demo(client):
         assert k in kinds, k
 
 
-async def test_tool_refuses_ineligible_volunteer(client):
-    """Governance is enforced by the tool, not by the agent's good behaviour."""
-    await client.post("/api/system/mode", json={"mode": "nuroen"})
-    r = await client.post(
-        "/tools/create-report",
-        headers=TOOL_HEADERS,
-        json={"text": "Person unconscious near Central Market.", "source": "citizen", "agent": "coordinator"},
-    )
-    rid = r.json()["report_id"]
-    r = await client.post(
-        "/tools/submit-intake",
-        headers=TOOL_HEADERS,
-        json={
-            "report_id": rid,
-            "need_type": "medical",
-            "location_text": "Central Market",
-            "people_affected": 1,
-            "confidence": 0.85,
-            "agent": "intake-agent",
-        },
-    )
-    assert r.json()["needs_review"] is False
-    r = await client.post(
-        "/tools/submit-triage",
-        headers=TOOL_HEADERS,
-        json={"report_id": rid, "life_safety": True, "rationale": "unconscious", "agent": "triage-agent"},
-    )
-    assert r.json()["policy_rule"] == "GOV-01"
-    r = await client.post(
-        "/tools/propose-assignment",
-        headers=TOOL_HEADERS,
-        json={"report_id": rid, "volunteer_id": "V-02", "explanation": "closest", "agent": "dispatch-agent"},
-    )
-    assert r.status_code == 409
-    assert r.json()["detail"]["code"] == "policy_blocked"
-    assert "certification" in r.json()["detail"]["message"].lower()
+async def test_assignment_refuses_ineligible_volunteer(client):
+    """Governance is enforced inside the workflow step, whoever proposes the volunteer."""
+    text = "Person unconscious near Central Market."
+    async with unit_of_work() as s:
+        report = await workflow.ingest_report(
+            s, text=text, source_type="citizen", source_identifier=None, actor=audit.DISPATCHER
+        )
+    intake, triage = extract(text)
+    async with unit_of_work() as s:
+        res = await workflow.submit_intake(s, report.id, intake, audit.stage("intake"))
+    assert res["needs_review"] is False
+    async with unit_of_work() as s:
+        res = await workflow.submit_triage(s, report.id, triage, audit.stage("triage"))
+    assert res["policy_rule"] == "GOV-01"
 
-    audit = (await client.get(f"/api/audit/{rid}")).json()
-    assert any(e["event_type"] == "TOOL_REFUSED" for e in audit)
-    assert any(e["actor_id"] == "nuroen:intake-agent" for e in audit)
+    with pytest.raises(WorkflowError) as refused:
+        async with unit_of_work() as s:
+            await workflow.propose_assignment(s, report.id, "V-02", "closest", audit.stage("dispatch"))
+    assert refused.value.code == "policy_blocked"
+    assert "certification" in refused.value.message.lower()
 
-
-async def test_tools_require_key(client):
-    assert (await client.post("/tools/ping")).status_code == 401
-    assert (await client.post("/tools/ping", headers=TOOL_HEADERS)).status_code == 200
-
-
-async def test_local_cannot_steal_nuroen_report_and_vice_versa(client):
-    await client.post("/api/system/mode", json={"mode": "nuroen"})
-    r = await client.post(
-        "/api/reports",
-        json={"text": "Need drinking water for 15 people near Station Road.", "source": "citizen"},
-    )
-    rid = r.json()["id"]
-    assert r.json()["orchestrator"] is None  # waiting for Nuroen pickup
-    await client.post(f"/api/reports/{rid}/process-locally")
-    r = await client.post("/tools/claim-report", headers=TOOL_HEADERS, json={"report_id": rid})
-    assert r.status_code == 409 and r.json()["detail"]["code"] == "report_owned_by_local"
+    trail = (await client.get(f"/api/audit/{report.id}")).json()
+    assert any(e["event_type"] == "ASSIGNMENT_REFUSED" for e in trail)
+    assert any(e["actor_id"] == "intake-stage" for e in trail)

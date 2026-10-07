@@ -1,6 +1,6 @@
 """Live adaptation: when hazards change, invalidate unsafe active routes and recalculate.
 
-Safety-critical and latency-critical → deterministic backend logic (actor: safety-monitor), no LLM.
+Safety-critical and latency-critical → deterministic backend logic (actor: safety-monitor).
 """
 
 from sqlalchemy import select

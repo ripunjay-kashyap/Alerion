@@ -1,4 +1,4 @@
-"""Deterministic route safety. The LLM never overrides this."""
+"""Deterministic route safety. No caller can override a failed check."""
 
 from dataclasses import dataclass
 from typing import Any

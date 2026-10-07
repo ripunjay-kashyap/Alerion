@@ -8,7 +8,6 @@ import type {
   Report,
   ReportInput,
   ScenarioStatus,
-  SystemInfo,
 } from "./types";
 
 export const API_URL = (
@@ -86,10 +85,6 @@ export const api = {
     USE_MOCK
       ? mock().then((m) => m.nextScenarioEvent())
       : post<ScenarioStatus>("/api/scenario/next"),
-  setMode: (mode: SystemInfo["orchestration_mode"]) =>
-    USE_MOCK
-      ? mock().then((m) => m.setMode(mode))
-      : post<SystemInfo>("/api/system/mode", { mode }),
   activateHazard: (id: string) =>
     USE_MOCK
       ? mock().then((m) => m.activateHazard(id))
@@ -110,8 +105,4 @@ export const api = {
     USE_MOCK
       ? mock().then((m) => m.submitReport(body))
       : post<Report>("/api/reports", body),
-  processLocally: (id: string) =>
-    USE_MOCK
-      ? mock().then((m) => m.processLocally(id))
-      : post<{ ok: boolean }>(`/api/reports/${idPath(id)}/process-locally`),
 };

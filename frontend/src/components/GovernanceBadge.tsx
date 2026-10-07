@@ -10,7 +10,7 @@ export default function GovernanceBadge({
   event?: AuditEntry["event_type"];
 }) {
   const auditLabels: Partial<Record<AuditEntry["event_type"], string>> = {
-    TOOL_REFUSED: "BLOCKED BY POLICY",
+    ASSIGNMENT_REFUSED: "BLOCKED BY POLICY",
     ROUTE_REJECTED: "ROUTE REJECTED",
     VOLUNTEER_REJECTED: "VOLUNTEER REJECTED",
   };

@@ -9,10 +9,10 @@ import ApprovalQueue from "./ApprovalQueue";
 import GovernanceBadge from "./GovernanceBadge";
 import RouteInvalidatedBanner from "./RouteInvalidatedBanner";
 import ScenarioControls from "./ScenarioControls";
-import SystemStatus, { FallbackModeBanner, StatsChips } from "./SystemStatus";
+import SystemStatus, { StatsChips } from "./SystemStatus";
 import { clockTime } from "@/lib/format";
 import ReportForm from "./ReportForm";
-import AgentRunPanel from "./AgentRunPanel";
+import PipelinePanel from "./PipelinePanel";
 import AuditTimeline from "./AuditTimeline";
 
 const MapView = dynamic(() => import("./MapView"), {
@@ -33,7 +33,6 @@ export default function Dashboard() {
     error,
     refresh,
     routeInvalidation,
-    fallback,
     resetVersion,
   } = useOpsState();
   const [selection, setSelection] = useState<{
@@ -72,7 +71,7 @@ export default function Dashboard() {
   const policyEvents = [...audit]
     .reverse()
     .filter((e) =>
-      ["TOOL_REFUSED", "ROUTE_REJECTED", "VOLUNTEER_REJECTED"].includes(
+      ["ASSIGNMENT_REFUSED", "ROUTE_REJECTED", "VOLUNTEER_REJECTED"].includes(
         e.event_type,
       ),
     )
@@ -104,12 +103,7 @@ export default function Dashboard() {
                 </p>
               </div>
             </div>
-            <SystemStatus
-              system={state?.system ?? null}
-              connected={connected}
-              refresh={refresh}
-              onError={onError}
-            />
+            <SystemStatus connected={connected} />
           </div>
           <div className="header-stats">
             <StatsChips system={state?.system ?? null} />
@@ -137,18 +131,12 @@ export default function Dashboard() {
             </button>
           </div>
         )}
-        <FallbackModeBanner
-          system={state?.system ?? null}
-          fallback={fallback}
-        />
         <div className="ops-workspace">
           <aside className="left-panel">
             <IncidentFeed
               state={state}
               selectedReportId={selectedReportId}
               onSelect={onSelect}
-              refresh={refresh}
-              onError={onError}
             />
             <ReportForm
               refresh={refresh}
@@ -222,7 +210,7 @@ export default function Dashboard() {
               aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen((v) => !v)}
             >
-              {drawerOpen ? "▾" : "▸"} AGENT PIPELINE / AUDIT{" "}
+              {drawerOpen ? "▾" : "▸"} PIPELINE / AUDIT{" "}
               <span className="text-slate-500">{audit.length} EVENTS</span>
             </button>
             <span className="font-mono muted">
@@ -231,7 +219,7 @@ export default function Dashboard() {
           </div>
           {drawerOpen && (
             <div className="drawer-content">
-              <AgentRunPanel
+              <PipelinePanel
                 report={state?.reports.find((r) => r.id === selectedReportId)}
                 audit={audit}
               />

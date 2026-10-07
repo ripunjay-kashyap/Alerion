@@ -183,15 +183,11 @@ try {
   });
   assert.equal(received.workflow_status, "RECEIVED");
   assert.equal(received.latitude, null);
-  await mockApi.setMode("nuroen");
-  await mockApi.processLocally(received.id);
-  assert.equal((await mockApi.state()).system.stats.fallbacks, 1);
-  assert.ok(events.some((e) => e.data.reason === "fallback_activated"));
-  await mockApi.reject(`APR-${received.id}`, {
-    note: "Duplicate caller clarified.",
+  await mockApi.reject("APR-D", {
+    note: "Caller could not confirm a location.",
   });
   assert.equal(
-    (await mockApi.state()).reports.find((r) => r.id === received.id)
+    (await mockApi.state()).reports.find((r) => r.id === "INC-D")
       .workflow_status,
     "REJECTED",
   );
@@ -233,7 +229,7 @@ try {
     if (oldFlag !== undefined) process.env.NEXT_PUBLIC_USE_MOCK = oldFlag;
   }
   console.log(
-    "Mock contract checks passed: isolated snapshots, approvals, review, reroute events, reset/cursors, full scenario, fallback and live 409 errors.",
+    "Mock contract checks passed: isolated snapshots, approvals, review, reroute events, reset/cursors, full scenario, rejection and live 409 errors.",
   );
 } finally {
   rmSync(temp, { recursive: true, force: true });

@@ -12,7 +12,6 @@ const eventsByStage: Record<Stage, AuditEventType[]> = {
   Intake: [
     "REPORT_RECEIVED",
     "REPORT_MERGED",
-    "REPORT_CLAIMED",
     "INTAKE_STRUCTURED",
     "LOCATION_RESOLVED",
   ],
@@ -23,7 +22,7 @@ const eventsByStage: Record<Stage, AuditEventType[]> = {
     "APPROVAL_REQUESTED",
     "APPROVAL_GRANTED",
     "APPROVAL_REJECTED",
-    "TOOL_REFUSED",
+    "ASSIGNMENT_REFUSED",
   ],
   Dispatch: [
     "VOLUNTEERS_FILTERED",
@@ -42,13 +41,7 @@ const eventsByStage: Record<Stage, AuditEventType[]> = {
     "ASSIGNMENT_COMPLETED",
     "ASSIGNMENT_FAILED",
   ],
-  System: [
-    "FALLBACK_ACTIVATED",
-    "SCENARIO_STARTED",
-    "SCENARIO_EVENT",
-    "SCENARIO_RESET",
-    "MODE_CHANGED",
-  ],
+  System: ["SCENARIO_STARTED", "SCENARIO_EVENT", "SCENARIO_RESET"],
 };
 export function stageOf(event: AuditEventType): Stage {
   return (
@@ -70,7 +63,7 @@ export function stageStatus(
     return "pending";
   if (
     [
-      "TOOL_REFUSED",
+      "ASSIGNMENT_REFUSED",
       "VOLUNTEER_REJECTED",
       "ROUTE_REJECTED",
       "APPROVAL_REJECTED",
@@ -80,7 +73,6 @@ export function stageStatus(
     return "blocked";
   if (
     [
-      "REPORT_CLAIMED",
       "TRUST_EVALUATED",
       "TRIAGE_RECORDED",
       "VOLUNTEERS_FILTERED",

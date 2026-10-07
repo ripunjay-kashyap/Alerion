@@ -30,7 +30,6 @@ export interface Report {
   policy_rule: string | null; // "GOV-01"
   policy_reason: string | null;
   workflow_status: ReportStatus;
-  orchestrator: "nuroen" | "local" | null; // who processed / is processing it
   merged_into: string | null; // (new) set when this report was merged as a duplicate
   duplicate_count: number; // (new) how many duplicates merged INTO this report
   created_at: string;
@@ -39,7 +38,6 @@ export interface Report {
 
 export type ReportStatus =
   | "RECEIVED"
-  | "STRUCTURING"
   | "STRUCTURED"
   | "NEEDS_REVIEW"
   | "TRIAGED"
@@ -91,7 +89,7 @@ export interface Assignment {
   route_distance_meters: number | null;
   previous_route_geometry: GeoJSON.LineString | null; // set after a reroute
   previous_eta_seconds: number | null;
-  explanation: string | null; // 1–2 lines from Dispatch agent / local rules
+  explanation: string | null; // 1–2 line reason from the dispatch step
   selection: Selection | null;
   proposed_by: string | null; // actor id
   created_at: string;
@@ -159,17 +157,12 @@ export interface Volunteer {
 }
 
 export interface SystemInfo {
-  orchestration_mode: "local" | "nuroen";
-  nuroen_status: "ok" | "degraded" | "unknown"; // "ok" once a Nuroen agent has called a tool recently
   scenario_status: "idle" | "running" | "done";
   scenario_run_id: string | null;
   stats: {
     // (new)
     reports_received: number;
-    duplicates_merged: number; // = agent runs saved (cost guard)
-    nuroen_processed: number;
-    local_processed: number;
-    fallbacks: number; // reports that timed out waiting for Nuroen
+    duplicates_merged: number; // = pipeline runs saved (cost guard)
   };
 }
 
@@ -188,9 +181,8 @@ export interface AuditEntry {
   entity_id: string;
   report_id: string | null; // group the timeline per incident with this
   event_type: AuditEventType;
-  actor_type: "agent" | "human" | "system";
+  actor_type: "pipeline" | "human" | "system";
   actor_id: string; // see §5
-  run_id: string | null; // Nuroen run/conversation id when known
   message: string; // human-readable, show as-is
   policy_rule: string | null;
   input_snapshot: Record<string, unknown> | null;
@@ -201,7 +193,6 @@ export interface AuditEntry {
 export type AuditEventType =
   | "REPORT_RECEIVED"
   | "REPORT_MERGED"
-  | "REPORT_CLAIMED"
   | "INTAKE_STRUCTURED"
   | "LOCATION_RESOLVED"
   | "TRUST_EVALUATED"
@@ -212,7 +203,7 @@ export type AuditEventType =
   | "APPROVAL_REQUESTED"
   | "APPROVAL_GRANTED"
   | "APPROVAL_REJECTED"
-  | "TOOL_REFUSED"
+  | "ASSIGNMENT_REFUSED"
   | "VOLUNTEERS_FILTERED"
   | "VOLUNTEER_REJECTED"
   | "ROUTE_CHECKED"
@@ -226,11 +217,9 @@ export type AuditEventType =
   | "ROUTE_RECALCULATED"
   | "ASSIGNMENT_COMPLETED"
   | "ASSIGNMENT_FAILED"
-  | "FALLBACK_ACTIVATED"
   | "SCENARIO_STARTED"
   | "SCENARIO_EVENT"
-  | "SCENARIO_RESET"
-  | "MODE_CHANGED";
+  | "SCENARIO_RESET";
 
 export interface ScenarioStatus {
   status: "idle" | "running" | "done";
@@ -273,7 +262,6 @@ export type EventName =
   | "volunteer.updated"
   | "audit.appended"
   | "scenario.updated"
-  | "system.updated"
   | "system.reset";
 export interface OpsEvent {
   event: EventName;

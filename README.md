@@ -1,11 +1,11 @@
 # Disaster Relief Router
 
-**A governed multi-agent disaster dispatch system: messy flood reports in, safe, auditable volunteer assignments and live Mapbox routes out.**
+**A governed disaster dispatch system: messy flood reports in, safe, auditable volunteer assignments and live Mapbox routes out.**
 
-Built for the Nuroen hackathon · Guwahati (Assam) flood scenario · Nuroen · FastAPI · Supabase · Mapbox · Next.js
+Guwahati (Assam) flood scenario · FastAPI backend · Next.js frontend · Supabase · Mapbox
 
 - **Live dashboard:** _Vercel URL_
-- **API:** https://alerion-backend.onrender.com ([docs](https://alerion-backend.onrender.com/docs) · [agent tools](https://alerion-backend.onrender.com/tools/docs))
+- **API:** https://alerion-backend.onrender.com ([docs](https://alerion-backend.onrender.com/docs))
 
 > Free-tier backend: open `/api/health` once to wake it before use.
 
@@ -27,32 +27,51 @@ different capabilities, and roads close in real time.
 5. **Generates safe routes** on real roads that avoid active flood zones and blocked roads.
 6. **Requires human approval** for sensitive dispatches. Approvals re-validate the route at approval time.
 7. **Reroutes live** when a new hazard cuts an active route (hero demo: ETA 9.7 → 13.3 min, old route shown dashed).
-8. **Audits everything.** Every extraction, score, policy decision, refusal, approval, dispatch and reroute, with the acting agent or human.
-9. **Controls cost.** Near-duplicate reports merge into the existing incident and raise its trust without spending an agent run.
+8. **Audits everything.** Every extraction, score, policy decision, refusal, approval, dispatch and reroute, with the acting pipeline stage, system component or human.
+9. **Merges duplicates.** Near-duplicate reports fold into the existing incident and raise its trust instead of starting a second pipeline run or dispatch.
 
 ## Architecture
 
+The project has two parts: a FastAPI backend that owns every decision and all state, and a Next.js dashboard that renders it.
+
 ```
-            Next.js + Mapbox dashboard (Vercel)
+            Next.js + Mapbox dashboard (frontend/, Vercel)
                  │  HTTP + SSE (backend is the source of truth)
                  ▼
-            FastAPI execution & safety plane (Render) ──── Supabase Postgres (canonical state)
-            ├─ workflow steps: intake → triage → governance → dispatch
+            FastAPI execution & safety plane (backend/, Render) ──── Supabase Postgres (canonical state)
+            ├─ report pipeline: intake → triage → governance → dispatch
             ├─ policy engine (policy.yaml): trust, priority, rules UNC-01 / GOV-01..99
             ├─ eligibility funnel + safe-route search (Mapbox Directions + shapely)
-            ├─ reroute engine (safety-monitor), simulator, audit trail
-            └─ /tools/*: narrow, governed agent tools (OpenAPI), integration-ready for Nuroen
-
-            Nuroen: governed agent layer
-            └─ Master Agentic Flow "Disaster Coordinator"
-               ├─ Intake Agent · Triage Agent · Governance Agent · Dispatch Agent (approval gate + Slack)
-               └─ same rule ids and outputs as the product (per-incident run sheet export)
+            ├─ approvals, reroute engine (safety-monitor), audit trail
+            └─ scenario simulator (timed or manual replay of scenarios/*.json)
 ```
 
-**Hybrid intelligence by design:** LLM agents handle ambiguity (messy text, urgency language, explanations).
-Everything safety-critical is deterministic code: trust, priority, eligibility, certification, hazard intersection,
-route safety, approvals and assignment state. **No agent can override a failed safety check.** The backend tools refuse
-(HTTP 409, audited as `TOOL_REFUSED`) instead of trusting the caller.
+Every new report runs through the same pipeline, whether it comes from the simulator or the dashboard's report form
+(near-duplicates are merged into their incident first).
+Each stage commits its result in its own transaction and publishes an SSE event, so the dashboard shows the pipeline
+advancing stage by stage.
+
+**Deterministic by design.** Intake uses exact-match fixtures for the scenario reports and a conservative keyword parser
+for everything else. When the parser is unsure it lowers its confidence, and UNC-01 sends the report to a human instead
+of guessing. Everything safety-critical is deterministic code: trust, priority, eligibility, certification, hazard
+intersection, route safety, approvals and assignment state. **Every mutating step re-validates before it commits:** an
+assignment that fails eligibility or route safety is refused and audited, and approving a dispatch whose route has since
+become unsafe triggers a safe reroute, or a refusal (HTTP 409) when none exists.
+
+## Repository layout
+
+```
+backend/              FastAPI service
+  app/api/            product API (/api/*) and the SSE stream
+  app/orchestrator/   report pipeline (intake → triage → dispatch)
+  app/services/       workflow steps, policy, routing, safety, reroute, audit, seeding
+  policy.yaml         governance rules and scoring weights
+  seed/               volunteers, hazards, known places, intake fixtures, cached Mapbox responses
+  tests/              offline end-to-end scenario tests
+frontend/             Next.js + Mapbox operations dashboard (opt-in mock mode for UI work)
+scenarios/            replayable demo scenarios
+render.yaml           Render blueprint for the backend
+```
 
 ## Governance rules (`backend/policy.yaml`)
 
@@ -79,7 +98,7 @@ scenario works even offline.
 |---|---|---|
 | 0 s | Official: family trapped, Riverside Apartments | GOV-02 auto → V-04 (rescue, 4x4) |
 | 8 s | Citizen: person unconscious, Central Market | GOV-01 approval · V-02 rejected *medical certification missing* · route avoids HZ-01 |
-| 13 s | Citizen: someone collapsed, Fancy Bazaar | duplicate merged (0 agent runs), trust 0.55 → 0.70 |
+| 13 s | Citizen: someone collapsed, Fancy Bazaar | duplicate merged (no second pipeline run), trust 0.55 → 0.70 |
 | 18 s | Citizen: drinking water for 15, Station Road | GOV-03 auto → V-06 (supply truck) |
 | 24 s | Anonymous: "help water everywhere pls" | UNC-01 human review |
 | 35 s | Flood zone HZ-02 activates | V-04 route invalidated → safe reroute, ETA 9.7 → 13.3 min |
@@ -99,6 +118,14 @@ cd frontend
 cp .env.example .env.local      # NEXT_PUBLIC_API_URL, NEXT_PUBLIC_MAPBOX_TOKEN (NEXT_PUBLIC_USE_MOCK=1 for mock mode)
 npm ci && npm run dev
 ```
+
+## Deploy
+
+- **Backend → Render** via `render.yaml`. Set `DATABASE_URL` (Supabase session pooler URI), `MAPBOX_TOKEN` and
+  `CORS_ORIGINS` in the Render dashboard (`render.yaml` sets `MAPBOX_MODE=cache_first`). Runs as one instance with
+  one worker, because the SSE event bus and the pipeline tasks are in-process.
+- **Frontend → Vercel** from `frontend/`. `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_MAPBOX_TOKEN` (a URL-restricted public
+  token) are read at build time from `frontend/.env.production`.
 
 ## Scope & claims
 

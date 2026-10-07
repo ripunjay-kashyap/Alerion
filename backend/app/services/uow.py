@@ -1,7 +1,7 @@
 """Unit of work: one serialized, committed transaction per workflow step.
 
 Single instance + low volume → one global lock is the simplest way to rule out races
-(two reports grabbing the same volunteer, Nuroen and fallback processing one report, etc.).
+(two reports grabbing the same volunteer, a reroute racing a dispatcher approval, etc.).
 """
 
 import asyncio

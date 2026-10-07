@@ -12,7 +12,7 @@ from sqlalchemy import select
 
 from app.config import get_settings
 from app.models import Hazard
-from app.orchestrator import local
+from app.orchestrator import pipeline
 from app.services import audit, reroute, workflow
 from app.services.uow import unit_of_work
 from app.services.workflow import WorkflowError
@@ -87,7 +87,7 @@ async def start(scenario_id: str, mode: str) -> dict[str, Any]:
         )
         audit.emit(s, "scenario.updated")
     if mode == "timed":
-        run.task = local.spawn(_timed_loop())
+        run.task = pipeline.spawn(_timed_loop())
     return run.status_out()
 
 
@@ -125,7 +125,7 @@ async def _fire(ev: dict[str, Any]) -> None:
                 source_identifier=p.get("source_identifier"),
                 actor=audit.SIMULATOR,
             )
-            if report.orchestrator == "local" and report.workflow_status == "RECEIVED":
+            if report.workflow_status == "RECEIVED":
                 kick_id = report.id
         elif ev["type"] == "hazard":
             hazard = (await s.scalars(select(Hazard).where(Hazard.id == p["hazard_id"]))).first()
@@ -137,7 +137,7 @@ async def _fire(ev: dict[str, Any]) -> None:
             state.scenario_status = "done"
         audit.emit(s, "scenario.updated")
     if kick_id:
-        local.kick(kick_id)
+        pipeline.kick(kick_id)
 
 
 def stop() -> None:

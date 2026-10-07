@@ -66,7 +66,7 @@ async def seed_reference_data(session: AsyncSession) -> None:
                 setattr(existing, k, val)
 
     if await session.get(SystemState, 1) is None:
-        session.add(SystemState(id=1, orchestration_mode=get_settings().orchestration_mode))
+        session.add(SystemState(id=1))
 
     await session.commit()
 

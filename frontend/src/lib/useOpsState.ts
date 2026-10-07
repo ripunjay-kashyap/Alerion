@@ -34,7 +34,6 @@ export function useOpsState() {
   const [error, setError] = useState<string | null>(null);
   const [routeInvalidation, setRouteInvalidation] =
     useState<RouteInvalidation | null>(null);
-  const [fallback, setFallback] = useState(false);
   const [resetVersion, setResetVersion] = useState(0);
   const sync = useRef<() => Promise<void>>(async () => {});
   const refresh = useCallback(() => sync.current(), []);
@@ -101,7 +100,6 @@ export function useOpsState() {
         lastSeq = 0;
         setAudit([]);
         setRouteInvalidation(null);
-        setFallback(false);
         setResetVersion((v) => v + 1);
       }
       if (
@@ -117,11 +115,6 @@ export function useOpsState() {
           new_eta_seconds: numberValue(event.data.new_eta_seconds),
         });
       }
-      if (
-        event.event === "system.updated" &&
-        event.data.reason === "fallback_activated"
-      )
-        setFallback(true);
       schedule();
     }
     if (USE_MOCK) {
@@ -173,7 +166,6 @@ export function useOpsState() {
     error,
     refresh,
     routeInvalidation,
-    fallback,
     resetVersion,
   };
 }

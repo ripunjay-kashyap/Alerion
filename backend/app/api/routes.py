@@ -3,7 +3,6 @@
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import PlainTextResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
@@ -21,7 +20,7 @@ from app.models import (
     SystemState,
     Volunteer,
 )
-from app.orchestrator import local
+from app.orchestrator import pipeline
 from app.schemas import (
     ApprovalOut,
     ApprovalRejectIn,
@@ -30,7 +29,6 @@ from app.schemas import (
     AuditOut,
     HazardIn,
     HazardOut,
-    ModeIn,
     ReportIn,
     ReportOut,
     ScenarioStartIn,
@@ -40,7 +38,7 @@ from app.schemas import (
     SystemStats,
     VolunteerOut,
 )
-from app.services import audit, nuroen_export, reroute, workflow
+from app.services import audit, reroute, workflow
 from app.services.seed import reset_operational_state
 from app.services.uow import unit_of_work
 from app.services.workflow import WorkflowError
@@ -87,8 +85,8 @@ async def create_report(body: ReportIn) -> Report:
             source_identifier=body.source_identifier,
             actor=audit.DISPATCHER,
         )
-    if report.orchestrator == "local" and report.workflow_status == "RECEIVED":
-        local.kick(report.id)
+    if report.workflow_status == "RECEIVED":
+        pipeline.kick(report.id)
     return report
 
 
@@ -100,21 +98,6 @@ async def list_reports(session: AsyncSession = Depends(get_session)):
 @router.get("/reports/{report_id}", response_model=ReportOut)
 async def get_report(report_id: str, session: AsyncSession = Depends(get_session)):
     return await workflow.get_report(session, report_id)
-
-
-@router.get("/reports/{report_id}/nuroen-export")
-async def nuroen_run_sheet(
-    report_id: str, format: str = "json", session: AsyncSession = Depends(get_session)
-):
-    """Node-by-node payloads (N1…N11) for mirroring this incident's run into the Nuroen workflow."""
-    sheet = await nuroen_export.run_sheet(session, report_id)
-    return PlainTextResponse(sheet["text"]) if format == "text" else sheet
-
-
-@router.post("/reports/{report_id}/process-locally")
-async def process_locally(report_id: str) -> dict:
-    await local.force_local(report_id)
-    return {"ok": True}
 
 
 # ---------------- approvals
@@ -133,7 +116,7 @@ async def approve(approval_id: str, body: ApprovalResolveIn | None = None):
             s, approval_id, approve=True, note=body.note, corrections=body.corrections, actor=audit.DISPATCHER
         )
     if follow_up:
-        local.kick(follow_up)
+        pipeline.kick(follow_up)
     return appr
 
 
@@ -251,7 +234,7 @@ async def audit_for_entity(entity_id: str, session: AsyncSession = Depends(get_s
     return (await session.scalars(q)).all()
 
 
-# ---------------- scenario & system
+# ---------------- scenario
 
 
 @router.post("/scenario/start", response_model=ScenarioStatusOut)
@@ -273,32 +256,11 @@ async def scenario_status():
 @router.post("/scenario/reset")
 async def reset_scenario() -> dict:
     simulator.stop()
-    local.bump_generation()
+    pipeline.bump_generation()
     async with unit_of_work() as s:
         await reset_operational_state(s)
     bus.publish("system.reset")
     return {"ok": True}
-
-
-@router.post("/system/mode", response_model=SystemOut)
-async def set_mode(body: ModeIn):
-    async with unit_of_work() as s:
-        state = await workflow.system_state(s)
-        if state.orchestration_mode != body.mode:
-            state.orchestration_mode = body.mode
-            if body.mode == "nuroen":
-                state.nuroen_status = "unknown"
-            audit.record(
-                s,
-                actor=audit.DISPATCHER,
-                event_type="MODE_CHANGED",
-                message=f"Orchestration mode set to {body.mode}",
-                entity_type="system",
-                entity_id="system",
-            )
-            audit.emit(s, "system.updated")
-    async with unit_of_work() as s:
-        return await _system(s)
 
 
 # ---------------- realtime

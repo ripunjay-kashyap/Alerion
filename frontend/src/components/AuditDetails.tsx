@@ -1,20 +1,22 @@
 import type { AuditEntry } from "@/lib/types";
 import { clockTime } from "@/lib/format";
 
+const actorLabels: Record<string, string> = {
+  "intake-stage": "INTAKE",
+  "triage-stage": "TRIAGE",
+  "dispatch-stage": "DISPATCH",
+  "policy-engine": "POLICY",
+  "safety-monitor": "SAFETY",
+};
 export function ActorBadge({ entry }: { entry: AuditEntry }) {
-  const actor = entry.actor_id.startsWith("nuroen:")
-    ? "NUROEN"
-    : entry.actor_type === "human"
+  const actor =
+    entry.actor_type === "human"
       ? "HUMAN"
-      : entry.actor_id === "safety-monitor"
-        ? "SAFETY"
-        : entry.actor_id.startsWith("local:")
-          ? "LOCAL"
-          : "SYSTEM";
+      : (actorLabels[entry.actor_id] ?? "SYSTEM");
   return (
     <span
       title={entry.actor_id}
-      className={`badge ${actor === "NUROEN" ? "badge-purple" : actor === "HUMAN" ? "badge-blue" : actor === "SAFETY" ? "badge-red" : "badge-slate"}`}
+      className={`badge ${actor === "HUMAN" ? "badge-blue" : actor === "SAFETY" ? "badge-red" : "badge-slate"}`}
     >
       {actor}
     </span>
@@ -36,10 +38,7 @@ export default function AuditDetails({ entry }: { entry: AuditEntry }) {
         )}
       </div>
       <p className="mt-2 text-xs">{entry.message}</p>
-      <p className="muted font-mono mt-1">
-        {entry.actor_id}
-        {entry.run_id ? ` · run ${entry.run_id}` : ""}
-      </p>
+      <p className="muted font-mono mt-1">{entry.actor_id}</p>
       {(["input_snapshot", "output_snapshot"] as const).map(
         (key) =>
           entry[key] && (

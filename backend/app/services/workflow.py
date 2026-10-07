@@ -1,9 +1,9 @@
-"""Workflow steps. The single implementation behind Nuroen tools, the local fallback and the operator API.
+"""Workflow steps. The single implementation behind the report pipeline and the operator API.
 
 Each step:
-  - checks ownership (Nuroen vs local) and the state machine,
-  - enforces policy deterministically (the caller — LLM or not — cannot bypass it),
-  - writes audit entries with the acting agent/human,
+  - checks the state machine,
+  - enforces policy deterministically (no caller can bypass it),
+  - writes audit entries with the acting stage, component or human,
   - leaves the commit to the caller's unit of work.
 """
 
@@ -13,7 +13,6 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.config import get_settings
 from app.models import (
     OPEN_ASSIGNMENT_STATUSES,
     TERMINAL_REPORT_STATUSES,
@@ -23,7 +22,6 @@ from app.models import (
     Assignment,
     AssignmentStatus,
     Hazard,
-    Orchestrator,
     Report,
     ReportStatus,
     SystemState,
@@ -34,7 +32,7 @@ from app.models import (
 from app.schemas import IntakeData, ReviewCorrections, TriageData
 from app.services import audit, geo, policy, routing
 from app.services.audit import Actor
-from app.services.intake_fallback import quick_need
+from app.services.intake import quick_need
 
 
 class WorkflowError(Exception):
@@ -118,34 +116,13 @@ def _report_audit(
     )
 
 
-# ---------------------------------------------------------------- ownership
+# ---------------------------------------------------------------- guards
 
 
-async def ensure_can_act(session: AsyncSession, report: Report, actor: Actor) -> None:
-    """Nuroen and the local fallback must never both process a report."""
+def ensure_open(report: Report) -> None:
+    """Terminal reports (completed, rejected, failed, merged) accept no further workflow steps."""
     if report.workflow_status in TERMINAL_REPORT_STATUSES:
         raise WorkflowError("invalid_transition", f"{report.id} is {report.workflow_status}")
-    if actor.kind == "human" or actor.id in {"system", "safety-monitor", "simulator"}:
-        return
-    if actor.is_nuroen:
-        if report.orchestrator == Orchestrator.LOCAL:
-            raise WorkflowError(
-                "report_owned_by_local",
-                f"{report.id} is being handled by the local fallback workflow; do not process it.",
-            )
-        if report.orchestrator is None:
-            report.orchestrator = Orchestrator.NUROEN
-            _report_audit(session, report, actor, "REPORT_CLAIMED", f"{actor.id} claimed {report.id}")
-        report.lease_until = _now() + timedelta(seconds=get_settings().nuroen_lease_extend_s)
-        state = await system_state(session)
-        if state.nuroen_status != "ok":
-            state.nuroen_status = "ok"
-            audit.emit(session, "system.updated")
-    else:  # local agent
-        lease = _aware(report.lease_until)
-        if report.orchestrator == Orchestrator.NUROEN and lease and lease > _now():
-            raise WorkflowError("report_owned_by_nuroen", f"{report.id} is being handled by Nuroen")
-        report.orchestrator = Orchestrator.LOCAL
 
 
 # ---------------------------------------------------------------- ingest (+ cost guard)
@@ -154,7 +131,7 @@ async def ensure_can_act(session: AsyncSession, report: Report, actor: Actor) ->
 async def ingest_report(
     session: AsyncSession, *, text: str, source_type: str, source_identifier: str | None, actor: Actor
 ) -> Report:
-    """Create a report. Near-duplicates of an open incident are merged deterministically (0 agent runs)."""
+    """Create a report. Near-duplicates of an open incident are merged deterministically (no pipeline run)."""
     cfg = policy.config()["trust"]
     place, need = geo.match_known_place(text), quick_need(text)
     if place and need:
@@ -175,11 +152,6 @@ async def ingest_report(
 
     report = Report(raw_text=text, source_type=source_type, source_identifier=source_identifier)
     state = await system_state(session)
-    if state.orchestration_mode == "nuroen":
-        # waiting for pickup from Nuroen chat; watchdog falls back to local after the timeout
-        report.lease_until = _now() + timedelta(seconds=get_settings().nuroen_pickup_timeout_s)
-    else:
-        report.orchestrator = Orchestrator.LOCAL
     report.scenario_run_id = state.scenario_run_id
     session.add(report)
     await session.flush()
@@ -188,8 +160,7 @@ async def ingest_report(
         report,
         actor,
         "REPORT_RECEIVED",
-        f"Report received from {source_type} source"
-        + (" — waiting for Nuroen pickup" if report.orchestrator is None else ""),
+        f"Report received from {source_type} source",
         input_snapshot={"text": text, "source": source_type, "source_identifier": source_identifier},
     )
     audit.emit(session, "report.created", report_id=report.id)
@@ -235,7 +206,7 @@ async def _merge_duplicate(
         trust_note = f" Trust {old:.2f} → {t.score:.2f} (corroboration)."
     else:
         trust_note = ""
-    msg = f"Duplicate of {parent.id} ({distance_m:.0f} m away, same need) — merged, no agent run spent."
+    msg = f"Duplicate of {parent.id} ({distance_m:.0f} m away, same need) — merged, no pipeline run spent."
     _report_audit(session, dup, actor, "REPORT_MERGED", msg, output_snapshot={"merged_into": parent.id})
     _report_audit(
         session,
@@ -257,12 +228,8 @@ async def submit_intake(
     session: AsyncSession, report_id: str, data: IntakeData, actor: Actor
 ) -> dict[str, Any]:
     report = await get_report(session, report_id)
-    await ensure_can_act(session, report, actor)
-    if report.workflow_status not in {
-        ReportStatus.RECEIVED,
-        ReportStatus.STRUCTURING,
-        ReportStatus.STRUCTURED,
-    }:
+    ensure_open(report)
+    if report.workflow_status not in {ReportStatus.RECEIVED, ReportStatus.STRUCTURED}:
         raise WorkflowError("invalid_transition", f"Intake not allowed in state {report.workflow_status}")
 
     report.need_type = data.need_type
@@ -327,7 +294,6 @@ async def submit_intake(
             "needs_review": True,
             "policy_rule": decision.rule_id,
             "reason": decision.reason,
-            "next_step": "stop — a human dispatcher will review this report",
         }
 
     _set_status(session, report, ReportStatus.STRUCTURED)
@@ -337,7 +303,6 @@ async def submit_intake(
         "location": {"name": report.location_text, "lng": report.longitude, "lat": report.latitude},
         "trust_score": t.score,
         "verification_status": t.verification_status,
-        "next_step": "call submit_triage",
     }
 
 
@@ -393,7 +358,7 @@ async def submit_triage(
     session: AsyncSession, report_id: str, data: TriageData, actor: Actor
 ) -> dict[str, Any]:
     report = await get_report(session, report_id)
-    await ensure_can_act(session, report, actor)
+    ensure_open(report)
     if report.workflow_status not in {ReportStatus.STRUCTURED, ReportStatus.TRIAGED}:
         raise WorkflowError("invalid_transition", f"Triage not allowed in state {report.workflow_status}")
 
@@ -450,8 +415,6 @@ async def submit_triage(
         "policy_decision": d.outcome,
         "policy_rule": d.rule_id,
         "policy_reason": d.reason,
-        "next_step": "call get_eligible_volunteers, then propose_assignment"
-        + (" (assignment will wait for human approval)" if d.outcome == "APPROVAL_REQUIRED" else ""),
     }
 
 
@@ -570,7 +533,7 @@ def public_selection(sel: dict[str, Any]) -> dict[str, Any]:
 
 async def eligible_volunteers(session: AsyncSession, report_id: str, actor: Actor) -> dict[str, Any]:
     report = await get_report(session, report_id)
-    await ensure_can_act(session, report, actor)
+    ensure_open(report)
     if report.workflow_status != ReportStatus.TRIAGED:
         raise WorkflowError(
             "invalid_transition", f"Dispatch planning not allowed in state {report.workflow_status}"
@@ -620,11 +583,7 @@ async def eligible_volunteers(session: AsyncSession, report_id: str, actor: Acto
                     k: c[k] for k in ("volunteer_id", "eta_seconds", "distance_meters", "strategy")
                 },
             )
-    return {
-        "report_id": report.id,
-        **pub,
-        "instruction": "Choose `selected` unless you have a stated reason; you may only choose a candidate with safe=true.",
-    }
+    return {"report_id": report.id, **pub}
 
 
 # ---------------------------------------------------------------- assignment
@@ -634,7 +593,7 @@ async def propose_assignment(
     session: AsyncSession, report_id: str, volunteer_id: str, explanation: str | None, actor: Actor
 ) -> dict[str, Any]:
     report = await get_report(session, report_id)
-    await ensure_can_act(session, report, actor)
+    ensure_open(report)
     existing = await open_assignment(session, report.id)
     if existing:
         if existing.volunteer_id == volunteer_id:  # idempotent retry
@@ -655,7 +614,7 @@ async def propose_assignment(
             f"Cannot assign {volunteer_id}: {reason}",
             audit_entry={
                 "actor": audit.POLICY,
-                "event_type": "TOOL_REFUSED",
+                "event_type": "ASSIGNMENT_REFUSED",
                 "message": f"Refused assignment of {volunteer_id} requested by {actor.id}: {reason}",
                 "entity_type": "report",
                 "entity_id": report.id,
@@ -715,9 +674,6 @@ def _assignment_result(report: Report, asg: Assignment) -> dict[str, Any]:
         "eta_seconds": asg.route_eta_seconds,
         "requires_human_approval": asg.status == AssignmentStatus.AWAITING_APPROVAL,
         "policy_rule": report.policy_rule,
-        "next_step": "done — waiting for dispatcher approval"
-        if asg.status == AssignmentStatus.AWAITING_APPROVAL
-        else "done — volunteer dispatched; you may notify them",
     }
 
 
@@ -860,13 +816,11 @@ async def resolve_approval(
                 "invalid_transition", "Review approval needs a location and need type (use corrections)"
             )
         report.confidence = max(report.confidence or 0, 0.9)  # human-verified
-        report.orchestrator = Orchestrator.LOCAL
         _set_status(session, report, ReportStatus.STRUCTURED)
         follow_up = report.id
     elif approve and appr.action_type == ApprovalAction.ESCALATION:
         if asg:
             asg.status = AssignmentStatus.CANCELLED
-        report.orchestrator = Orchestrator.LOCAL
         _set_status(session, report, ReportStatus.TRIAGED)
         follow_up = report.id  # retry dispatch with current hazards / volunteers
     else:  # reject
@@ -906,8 +860,6 @@ def _apply_new_route(asg: Assignment, s: routing.RouteSearch) -> None:
 
 
 async def stats(session: AsyncSession) -> dict[str, int]:
-    from app.models import AuditEntry
-
     async def count(q) -> int:
         return int(await session.scalar(q) or 0)
 
@@ -915,14 +867,5 @@ async def stats(session: AsyncSession) -> dict[str, int]:
         "reports_received": await count(select(func.count()).select_from(Report)),
         "duplicates_merged": await count(
             select(func.count()).select_from(Report).where(Report.workflow_status == ReportStatus.MERGED)
-        ),
-        "nuroen_processed": await count(
-            select(func.count()).select_from(Report).where(Report.orchestrator == Orchestrator.NUROEN)
-        ),
-        "local_processed": await count(
-            select(func.count()).select_from(Report).where(Report.orchestrator == Orchestrator.LOCAL)
-        ),
-        "fallbacks": await count(
-            select(func.count()).select_from(AuditEntry).where(AuditEntry.event_type == "FALLBACK_ACTIVATED")
         ),
     }

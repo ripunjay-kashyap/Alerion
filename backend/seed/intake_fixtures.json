@@ -1,5 +1,5 @@
 {
-  "_note": "Exact-match fallback extraction for scenario reports (used only when Nuroen is unavailable). Keyed by normalized text.",
+  "_note": "Exact-match intake extraction for the scenario reports, so demo runs are reproducible. Keyed by normalized text.",
   "fixtures": {
     "family trapped near riverside apartments, ground floor flooding quickly.": {
       "need_type": "rescue",

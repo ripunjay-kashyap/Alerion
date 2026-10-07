@@ -220,10 +220,6 @@ textarea::placeholder {
   color: #293225;
   background: #dfe2d8;
 }
-.mode-toggle button.nuroen.active {
-  color: #76627a;
-  background: #eae4ec;
-}
 .header-stats {
   display: flex;
   justify-content: space-between;
@@ -341,11 +337,6 @@ textarea::placeholder {
   background: #edf3e8;
   color: #496348;
 }
-.badge-purple {
-  border-color: #d2c8d3;
-  background: #f0ecf1;
-  color: #76627a;
-}
 .badge-red {
   border-color: #dabcb4;
   background: #f6eae6;
@@ -362,8 +353,7 @@ textarea::placeholder {
   font-size: 10px;
   white-space: nowrap;
 }
-.connection-error,
-.fallback-banner {
+.connection-error {
   flex-shrink: 0;
   display: flex;
   align-items: center;
@@ -371,17 +361,9 @@ textarea::placeholder {
   gap: 12px;
   padding: 8px 18px;
   font-size: 11px;
-  border-bottom: 1px solid;
-}
-.connection-error {
+  border-bottom: 1px solid #ddbeb5;
   color: #934b40;
   background: #f7e9e5;
-  border-color: #ddbeb5;
-}
-.fallback-banner {
-  background: #f5efdf;
-  color: #7c612b;
-  border-color: #d7c69c;
 }
 .ops-workspace {
   flex: 1;
@@ -552,13 +534,6 @@ textarea::placeholder {
   margin-top: 10px;
   border-top: 1px solid #dfe2d8;
   padding-top: 7px;
-}
-.waiting-nuroen {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #cbd0c4;
-  color: #76627a;
-  font-size: 11px;
 }
 .approval-card {
   border: 1px solid #d6c9af;
@@ -1018,7 +993,7 @@ textarea::placeholder {
   grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
   height: calc(100% - 39px);
 }
-.agent-run-panel {
+.pipeline-panel {
   min-width: 0;
   padding: 12px 14px;
   border-right: 1px solid #dfe2d8;
@@ -1182,7 +1157,7 @@ textarea::placeholder {
   .audit-drawer.open {
     height: auto;
   }
-  .agent-run-panel {
+  .pipeline-panel {
     max-height: 250px;
   }
   .timeline-panel {

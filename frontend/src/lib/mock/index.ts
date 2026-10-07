@@ -6,7 +6,6 @@ import type {
   OpsState,
   ReportInput,
   ScenarioStatus,
-  SystemInfo,
 } from "../types";
 import { createFixture, receivedReport, safeRoute } from "./fixtures";
 import { seedHazards, seedVolunteers } from "./seed";
@@ -86,7 +85,6 @@ function append(
     report_id: null,
     actor_type: "system",
     actor_id: "system",
-    run_id: null,
     policy_rule: null,
     input_snapshot: null,
     output_snapshot: null,
@@ -101,19 +99,13 @@ function stopTimer() {
 }
 function reset() {
   stopTimer();
-  const mode = data().state.system.orchestration_mode;
   const clean: OpsState = {
     system: {
-      orchestration_mode: mode,
-      nuroen_status: "unknown",
       scenario_status: "idle",
       scenario_run_id: null,
       stats: {
         reports_received: 0,
         duplicates_merged: 0,
-        nuroen_processed: 0,
-        local_processed: 0,
-        fallbacks: 0,
       },
     },
     reports: [],
@@ -208,8 +200,6 @@ function nextEvent() {
   const { state } = data();
   if (index < 5) {
     const report = copy(fixture.state.reports[index]);
-    const isNuroen = state.system.orchestration_mode === "nuroen";
-    report.orchestrator = isNuroen ? "nuroen" : "local";
     report.created_at = report.updated_at = new Date().toISOString();
     state.reports.push(report);
     state.system.stats.reports_received++;
@@ -219,16 +209,11 @@ function nextEvent() {
       if (parent) parent.duplicate_count++;
     } else {
       report.duplicate_count = 0;
-      state.system.stats[isNuroen ? "nuroen_processed" : "local_processed"]++;
     }
-    if (isNuroen) state.system.nuroen_status = "ok";
     for (const assignment of fixture.state.assignments.filter(
       (a) => a.report_id === report.id,
     )) {
-      state.assignments.push({
-        ...copy(assignment),
-        proposed_by: isNuroen ? "nuroen:dispatch-agent" : "local:dispatch",
-      });
+      state.assignments.push(copy(assignment));
       const volunteer = state.volunteers.find(
         (v) => v.id === assignment.volunteer_id,
       );
@@ -247,10 +232,6 @@ function nextEvent() {
         ...entry,
         seq: (data().audit.at(-1)?.seq ?? 0) + 1,
         created_at: new Date().toISOString(),
-        actor_id:
-          isNuroen && entry.actor_id.startsWith("local:")
-            ? entry.actor_id.replace("local:", "nuroen:") + "-agent"
-            : entry.actor_id,
       });
     }
     emit("report.created", { report_id: report.id });
@@ -432,19 +413,6 @@ export const mockApi = {
       );
     return nextEvent();
   },
-  setMode: async (mode: SystemInfo["orchestration_mode"]) => {
-    data().state.system.orchestration_mode = mode;
-    append({
-      event_type: "MODE_CHANGED",
-      entity_type: "system",
-      entity_id: "system",
-      actor_type: "human",
-      actor_id: "dispatcher",
-      message: `Orchestration mode changed to ${mode}.`,
-    });
-    emit("system.updated");
-    return copy(data().state.system);
-  },
   activateHazard: async (id: string) => activateHazard(id, true),
   deactivateHazard: async (id: string) => activateHazard(id, false),
   approve: async (id: string, body: ApprovalInput = {}) =>
@@ -471,58 +439,5 @@ export const mockApi = {
     });
     emit("report.created", { report_id: report.id });
     return copy(report);
-  },
-  processLocally: async (id: string) => {
-    const report = data().state.reports.find((r) => r.id === id);
-    if (!report) throw new ApiError("Report not found.", 404, "not_found");
-    if (report.workflow_status !== "RECEIVED")
-      throw new ApiError(
-        "Only reports waiting for pickup can be processed locally.",
-        409,
-        "invalid_transition",
-      );
-    report.orchestrator = "local";
-    report.workflow_status = "NEEDS_REVIEW";
-    report.policy_decision = "NEEDS_REVIEW";
-    report.policy_rule = "UNC-01";
-    report.policy_reason = "Confirm the location and need in human review.";
-    report.updated_at = new Date().toISOString();
-    data().state.system.stats.local_processed++;
-    data().state.system.stats.fallbacks++;
-    data().state.system.nuroen_status = "degraded";
-    data().state.approvals.push({
-      id: `APR-${id}`,
-      report_id: id,
-      assignment_id: null,
-      action_type: "review",
-      reason: report.policy_reason,
-      policy_rule: "UNC-01",
-      status: "PENDING",
-      requested_by: "local:intake",
-      approved_by: null,
-      resolution_note: null,
-      created_at: report.updated_at,
-      resolved_at: null,
-    });
-    append({
-      event_type: "FALLBACK_ACTIVATED",
-      entity_type: "report",
-      entity_id: id,
-      report_id: id,
-      actor_id: "system",
-      message: "Nuroen pickup unavailable; local safe fallback activated.",
-    });
-    append({
-      event_type: "NEEDS_REVIEW",
-      entity_type: "report",
-      entity_id: id,
-      report_id: id,
-      actor_id: "local:intake",
-      actor_type: "agent",
-      message: report.policy_reason,
-      policy_rule: "UNC-01",
-    });
-    emit("system.updated", { reason: "fallback_activated", report_id: id });
-    return { ok: true as const };
   },
 };

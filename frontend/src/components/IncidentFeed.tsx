@@ -1,9 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
-import { api } from "@/lib/api";
 import type { OpsState, Report } from "@/lib/types";
 import { percent, label, eta } from "@/lib/format";
-import { useAction } from "@/lib/useAction";
 import { useHighlight } from "@/lib/useHighlight";
 import GovernanceBadge from "./GovernanceBadge";
 
@@ -11,8 +9,6 @@ interface Props {
   state: OpsState | null;
   selectedReportId: string | null;
   onSelect: (id: string) => void;
-  refresh: () => Promise<void>;
-  onError: (error: unknown) => void;
 }
 export default function IncidentFeed(props: Props) {
   const reports = [...(props.state?.reports ?? [])]
@@ -64,13 +60,10 @@ export function IncidentCard({
   state,
   selectedReportId,
   onSelect,
-  refresh,
-  onError,
 }: Props & { report: Report; state: OpsState }) {
   const selected = report.id === selectedReportId;
   const ref = useRef<HTMLElement>(null);
   useHighlight(ref, report.updated_at);
-  const action = useAction(onError, refresh);
   useEffect(() => {
     if (selected)
       ref.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -91,9 +84,6 @@ export function IncidentCard({
           : (report.priority_score ?? 0) >= 40
             ? "urgent"
             : "routine";
-  const waitForNuroen =
-    state.system.orchestration_mode === "nuroen" &&
-    report.workflow_status === "RECEIVED";
   return (
     <article
       ref={ref}
@@ -140,11 +130,6 @@ export function IncidentCard({
         >
           {label(report.workflow_status)}
         </span>
-        <span
-          className={`badge font-mono ${report.orchestrator === "nuroen" ? "badge-purple" : "badge-slate"}`}
-        >
-          {report.orchestrator?.toUpperCase() ?? "UNCLAIMED"}
-        </span>
       </div>
       <div className="mt-2">
         <GovernanceBadge
@@ -180,25 +165,6 @@ export function IncidentCard({
             </p>
           )}
         </details>
-      )}
-      {waitForNuroen && (
-        <div className="waiting-nuroen">
-          <p>Waiting for Nuroen pickup…</p>
-          <button
-            className="button mt-2"
-            disabled={action.pending}
-            onClick={() =>
-              void action.execute(() => api.processLocally(report.id))
-            }
-          >
-            {action.pending ? "Processing…" : "Process locally"}
-          </button>
-        </div>
-      )}
-      {action.error && (
-        <p role="alert" className="inline-error">
-          {action.error.message} {action.error.policyRule}
-        </p>
       )}
     </article>
   );

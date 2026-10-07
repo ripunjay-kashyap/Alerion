@@ -44,7 +44,6 @@ class NeedType(StrEnum):
 
 class ReportStatus(StrEnum):
     RECEIVED = "RECEIVED"
-    STRUCTURING = "STRUCTURING"
     STRUCTURED = "STRUCTURED"
     NEEDS_REVIEW = "NEEDS_REVIEW"
     TRIAGED = "TRIAGED"
@@ -55,7 +54,7 @@ class ReportStatus(StrEnum):
     COMPLETED = "COMPLETED"
     REJECTED = "REJECTED"
     FAILED = "FAILED"
-    MERGED = "MERGED"  # duplicate folded into another report (cost guard: no agent run)
+    MERGED = "MERGED"  # duplicate folded into another report (cost guard: no pipeline run)
 
 
 TERMINAL_REPORT_STATUSES = {
@@ -108,11 +107,6 @@ class VolunteerStatus(StrEnum):
     OFFLINE = "offline"
 
 
-class Orchestrator(StrEnum):
-    NUROEN = "nuroen"
-    LOCAL = "local"
-
-
 # ---------- tables ----------
 
 
@@ -156,8 +150,6 @@ class Report(TimestampMixin, Base):
 
     # workflow
     workflow_status: Mapped[str] = mapped_column(String(24), default=ReportStatus.RECEIVED)
-    orchestrator: Mapped[str | None] = mapped_column(String(16))
-    lease_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     scenario_run_id: Mapped[str | None] = mapped_column(String(32))
     merged_into: Mapped[str | None] = mapped_column(String(16), index=True)
     duplicate_count: Mapped[int] = mapped_column(Integer, default=0)
@@ -241,9 +233,8 @@ class AuditEntry(Base):
     entity_id: Mapped[str] = mapped_column(String(16), index=True)
     report_id: Mapped[str | None] = mapped_column(String(16), index=True)
     event_type: Mapped[str] = mapped_column(String(48))
-    actor_type: Mapped[str] = mapped_column(String(16))  # agent | human | system
+    actor_type: Mapped[str] = mapped_column(String(16))  # pipeline | human | system
     actor_id: Mapped[str] = mapped_column(String(64))
-    run_id: Mapped[str | None] = mapped_column(String(128))
     message: Mapped[str] = mapped_column(Text)
     policy_rule: Mapped[str | None] = mapped_column(String(16))
     input_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JsonType)
@@ -257,8 +248,6 @@ class SystemState(Base):
     __tablename__ = "system_state"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
-    orchestration_mode: Mapped[str] = mapped_column(String(16), default="auto")
-    nuroen_status: Mapped[str] = mapped_column(String(16), default="unknown")  # ok|degraded|unknown
     scenario_status: Mapped[str] = mapped_column(String(16), default="idle")  # idle|running|done
     scenario_run_id: Mapped[str | None] = mapped_column(String(32))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

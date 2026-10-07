@@ -136,7 +136,6 @@ export function receivedReport(
     policy_rule: null,
     policy_reason: null,
     workflow_status: "RECEIVED",
-    orchestrator: null,
     merged_into: null,
     duplicate_count: 0,
     created_at: timestamp,
@@ -156,7 +155,6 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
   ): Report {
     return {
       ...receivedReport(id, text, "citizen", timestamp(seconds)),
-      orchestrator: "local",
       ...fields,
     };
   }
@@ -285,7 +283,7 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
       previous_eta_seconds: null,
       explanation: null,
       selection: null,
-      proposed_by: "local:dispatch",
+      proposed_by: "dispatch-stage",
       created_at: timestamp(10),
       updated_at: timestamp(10),
       completed_at: null,
@@ -388,7 +386,7 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
         "Confirm the location and need before this report can enter triage.",
       policy_rule: "UNC-01",
       status: "PENDING",
-      requested_by: "local:intake",
+      requested_by: "intake-stage",
       approved_by: null,
       resolution_note: null,
       created_at: timestamp(65),
@@ -403,16 +401,11 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
     }
   const state: OpsState = {
     system: {
-      orchestration_mode: "local",
-      nuroen_status: "unknown",
       scenario_status: "idle",
       scenario_run_id: null,
       stats: {
         reports_received: 5,
         duplicates_merged: 1,
-        nuroen_processed: 0,
-        local_processed: 4,
-        fallbacks: 0,
       },
     },
     reports,
@@ -437,9 +430,8 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
       entity_id,
       report_id: report.id,
       event_type,
-      actor_type: actor_id.startsWith("local:") ? "agent" : "system",
+      actor_type: actor_id.endsWith("-stage") ? "pipeline" : "system",
       actor_id,
-      run_id: null,
       message,
       policy_rule:
         event_type === "POLICY_EVALUATED" || event_type === "APPROVAL_REQUESTED"
@@ -463,8 +455,8 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
       add(
         r,
         "REPORT_MERGED",
-        "local:intake",
-        `Duplicate merged into ${r.merged_into}; one agent run saved.`,
+        "intake-stage",
+        `Duplicate merged into ${r.merged_into}; one pipeline run saved.`,
         r.id,
         "report",
         { merged_into: r.merged_into },
@@ -474,7 +466,7 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
     add(
       r,
       "INTAKE_STRUCTURED",
-      "local:intake",
+      "intake-stage",
       r.location_text
         ? `Need and location resolved: ${r.location_text}.`
         : "Location and need remain unresolved.",
@@ -490,7 +482,7 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
       add(
         r,
         "TRUST_EVALUATED",
-        "local:triage",
+        "triage-stage",
         `Trust evaluated at ${r.trust_score}.`,
         r.id,
         "report",
@@ -499,7 +491,7 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
       add(
         r,
         "PRIORITY_SCORED",
-        "local:triage",
+        "triage-stage",
         `Priority scored ${r.priority_score}/100.`,
         r.id,
         "report",
@@ -519,7 +511,7 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
       add(
         r,
         "VOLUNTEERS_FILTERED",
-        "local:dispatch",
+        "dispatch-stage",
         `Eligibility funnel selected ${a.volunteer_id}.`,
         a.id,
         "assignment",
@@ -538,7 +530,7 @@ export function createFixture(): { state: OpsState; audit: AuditEntry[] } {
       add(
         r,
         a.status === "ACTIVE" ? "ASSIGNMENT_ACTIVATED" : "ASSIGNMENT_PROPOSED",
-        "local:dispatch",
+        "dispatch-stage",
         `${a.volunteer_id} · ETA ${Math.round((a.route_eta_seconds ?? 0) / 60)} min.`,
         a.id,
         "assignment",

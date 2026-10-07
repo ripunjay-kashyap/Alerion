@@ -1,4 +1,4 @@
-"""Pydantic I/O models for the product API. Tool-specific models live in app/tools."""
+"""Pydantic I/O models for the product API."""
 
 from datetime import datetime
 from typing import Any, Literal
@@ -37,7 +37,6 @@ class ReportOut(ORM):
     policy_rule: str | None
     policy_reason: str | None
     workflow_status: str
-    orchestrator: str | None
     merged_into: str | None
     duplicate_count: int
     created_at: datetime
@@ -111,7 +110,6 @@ class AuditOut(ORM):
     event_type: str
     actor_type: str
     actor_id: str
-    run_id: str | None
     message: str
     policy_rule: str | None
     input_snapshot: dict[str, Any] | None
@@ -122,14 +120,9 @@ class AuditOut(ORM):
 class SystemStats(BaseModel):
     reports_received: int = 0
     duplicates_merged: int = 0
-    nuroen_processed: int = 0
-    local_processed: int = 0
-    fallbacks: int = 0
 
 
 class SystemOut(ORM):
-    orchestration_mode: str
-    nuroen_status: str
     scenario_status: str
     scenario_run_id: str | None
     stats: SystemStats = SystemStats()
@@ -153,7 +146,7 @@ class ReportIn(BaseModel):
     source_identifier: str | None = None
 
 
-# ---------- workflow inputs (shared by Nuroen tools and the local orchestrator) ----------
+# ---------- workflow inputs (written by the intake and triage steps) ----------
 
 NeedLiteral = Literal["rescue", "medical", "food"]
 
@@ -206,10 +199,6 @@ class HazardIn(BaseModel):
     label: str = Field(min_length=1, max_length=128)
     kind: Literal["flood_zone", "blocked_road"] = "flood_zone"
     geometry: dict[str, Any]
-
-
-class ModeIn(BaseModel):
-    mode: Literal["local", "nuroen"]
 
 
 class ScenarioStartIn(BaseModel):

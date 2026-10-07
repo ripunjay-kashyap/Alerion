@@ -3,7 +3,6 @@
 *.md
 !README.md
 !**/README.md
-nuroendocs.txt
 *.notes.txt
 .claude/
 docs/
@@ -34,3 +33,4 @@ next-env.d.ts
 .vercel
 .idea/
 .vscode/
+submission_answers.txt

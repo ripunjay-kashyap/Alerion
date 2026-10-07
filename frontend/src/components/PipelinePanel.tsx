@@ -3,7 +3,7 @@ import { stages, stageOf, stageStatus } from "@/lib/audit";
 import { clockTime } from "@/lib/format";
 import AuditDetails, { ActorBadge } from "./AuditDetails";
 
-export default function AgentRunPanel({
+export default function PipelinePanel({
   report,
   audit,
 }: {
@@ -13,24 +13,19 @@ export default function AgentRunPanel({
   if (!report)
     return (
       <div className="empty-state">
-        Select an incident to inspect its agent pipeline.
+        Select an incident to inspect its pipeline.
       </div>
     );
   const entries = audit.filter(
     (e) => e.report_id === report.id || e.entity_id === report.id,
   );
   return (
-    <div className="agent-run-panel">
+    <div className="pipeline-panel">
       <div className="panel-heading">
         <h2>
-          Agent pipeline{" "}
+          Pipeline{" "}
           <span className="font-mono text-slate-300">/ {report.id}</span>
         </h2>
-        <span
-          className={`badge ${report.orchestrator === "nuroen" ? "badge-purple" : "badge-slate"}`}
-        >
-          {report.orchestrator?.toUpperCase() ?? "UNCLAIMED"}
-        </span>
       </div>
       <div className="pipeline">
         {stages

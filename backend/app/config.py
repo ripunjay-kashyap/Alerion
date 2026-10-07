@@ -19,16 +19,6 @@ class Settings(BaseSettings):
     mapbox_token: str = ""
     mapbox_mode: Literal["live", "cache_first", "cache_only"] = "cache_first"
 
-    # Nuroen-facing tool surface
-    tools_api_key: str = "dev-tools-key"
-
-    # Nuroen orchestration
-    # local: backend auto-processes reports. nuroen: reports wait for pickup from Nuroen chat,
-    # then fall back to local after the pickup timeout.
-    orchestration_mode: Literal["nuroen", "local"] = "local"
-    nuroen_pickup_timeout_s: int = 120
-    nuroen_lease_extend_s: int = 30
-
     # HTTP
     cors_origins: str = "http://localhost:3000"
 
