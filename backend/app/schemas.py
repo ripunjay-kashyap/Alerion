@@ -1,15 +1,21 @@
 """Pydantic I/O models for the product API."""
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models import SourceType
 
 
 class ORM(BaseModel):
     model_config = ConfigDict(from_attributes=True)
+
+    @field_validator("*")
+    @classmethod
+    def _utc(cls, v: Any) -> Any:
+        # Timestamps are stored in UTC; SQLite drops the tzinfo, so restore it for clients.
+        return v.replace(tzinfo=UTC) if isinstance(v, datetime) and v.tzinfo is None else v
 
 
 class ReportOut(ORM):

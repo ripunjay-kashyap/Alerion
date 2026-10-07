@@ -7,6 +7,7 @@ import type { Assignment, Hazard, OpsState } from "@/lib/types";
 import { api } from "@/lib/api";
 import VolunteerFunnel from "./VolunteerFunnel";
 import { ApiError, errorMessage } from "@/lib/errors";
+import { MAP_THEME_LUT } from "@/lib/mapTheme";
 
 type Popup = {
   kind: "hazard" | "volunteer";
@@ -26,26 +27,51 @@ const EMPTY: GeoJSON.FeatureCollection = {
 };
 const activeAssignment = (a: Assignment) =>
   ["ACTIVE", "REROUTING", "AWAITING_APPROVAL", "PROPOSED"].includes(a.status);
+// Overlay colors, chosen to stay legible on the dark neon basemap (shared with the legend).
+const C = {
+  critical: "#ff3b5c",
+  urgent: "#ffb020",
+  routine: "#ffe45c",
+  review: "#b9c0d9",
+  done: "#3dff9a",
+  route: "#3dff9a",
+  rerouting: "#ffb020",
+  proposed: "#d7dbf0",
+  previous: "#ff3b5c",
+  flood: "#2f8cff",
+  floodLine: "#6cc4ff",
+  inactive: "#8f97bd",
+  blocked: "#ff8a1f",
+  idle: "#7dd3fc",
+  enRoute: "#3dff9a",
+  onScene: "#c58cff",
+  offline: "#6b7290",
+  label: "#eef1ff",
+  halo: "#0a0e27",
+  stroke: "#f5f7ff",
+} as const;
+// Standard's night light preset dims custom layers unless they are emissive.
+const GLOW = 1;
 const reportColor = (status: string, priority: number | null) =>
   status === "NEEDS_REVIEW"
-    ? "#878e80"
+    ? C.review
     : status === "COMPLETED"
-      ? "#4f7056"
+      ? C.done
       : (priority ?? 0) >= 70
-        ? "#aa5649"
+        ? C.critical
         : (priority ?? 0) >= 40
-          ? "#a17c35"
-          : "#a48e48";
+          ? C.urgent
+          : C.routine;
 const eta = (seconds: number | null) =>
   seconds === null ? "—" : `${Math.ceil(seconds / 60)} min`;
 function previousOpacity(a: Assignment, selected: boolean) {
   const elapsed = (Date.now() - Date.parse(a.updated_at)) / 1000;
   return elapsed < 6
-    ? 0.8
+    ? 0.9
     : elapsed < 8
-      ? Math.max(selected ? 0.18 : 0, (0.8 * (8 - elapsed)) / 2)
+      ? Math.max(selected ? 0.6 : 0, (0.9 * (8 - elapsed)) / 2)
       : selected
-        ? 0.18
+        ? 0.6 // stays visible on the dark basemap while the incident is selected
         : 0;
 }
 function collections(
@@ -164,8 +190,9 @@ function addLayers(m: mapboxgl.Map) {
     source: "hazards",
     filter: ["==", ["geometry-type"], "Polygon"],
     paint: {
-      "fill-color": "#72909f",
-      "fill-opacity": ["case", ["get", "active"], 0.3, 0],
+      "fill-color": C.flood,
+      "fill-opacity": ["case", ["get", "active"], 0.28, 0],
+      "fill-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -177,7 +204,11 @@ function addLayers(m: mapboxgl.Map) {
       ["==", ["geometry-type"], "Polygon"],
       ["==", ["get", "active"], true],
     ],
-    paint: { "line-color": "#557385", "line-width": ["get", "pulse_width"] },
+    paint: {
+      "line-color": C.floodLine,
+      "line-width": ["get", "pulse_width"],
+      "line-emissive-strength": GLOW,
+    },
   });
   m.addLayer({
     id: "hazard-inactive",
@@ -189,9 +220,10 @@ function addLayers(m: mapboxgl.Map) {
       ["==", ["get", "active"], false],
     ],
     paint: {
-      "line-color": "#878e80",
+      "line-color": C.inactive,
       "line-width": 2,
       "line-dasharray": [3, 2],
+      "line-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -204,9 +236,10 @@ function addLayers(m: mapboxgl.Map) {
       ["==", ["get", "active"], true],
     ],
     paint: {
-      "line-color": "#ad7c4d",
+      "line-color": C.blocked,
       "line-width": 6,
       "line-dasharray": [2, 1],
+      "line-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -215,9 +248,10 @@ function addLayers(m: mapboxgl.Map) {
     source: "hazards",
     layout: { "text-field": ["get", "id"], "text-size": 11 },
     paint: {
-      "text-color": "#496879",
-      "text-halo-color": "#faf9f5",
+      "text-color": C.floodLine,
+      "text-halo-color": C.halo,
       "text-halo-width": 2,
+      "text-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -225,10 +259,11 @@ function addLayers(m: mapboxgl.Map) {
     type: "line",
     source: "previous-routes",
     paint: {
-      "line-color": "#aa5649",
-      "line-width": 3,
+      "line-color": C.previous,
+      "line-width": 4,
       "line-dasharray": [2, 2],
       "line-opacity": ["get", "opacity"],
+      "line-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -241,11 +276,12 @@ function addLayers(m: mapboxgl.Map) {
       "line-color": [
         "case",
         ["==", ["get", "status"], "REROUTING"],
-        "#a17c35",
-        "#4f7056",
+        C.rerouting,
+        C.route,
       ],
       "line-width": ["case", ["get", "selected"], 7, 4],
-      "line-opacity": ["case", ["get", "selected"], 1, 0.65],
+      "line-opacity": ["case", ["get", "selected"], 1, 0.75],
+      "line-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -258,9 +294,10 @@ function addLayers(m: mapboxgl.Map) {
       ["literal", ["AWAITING_APPROVAL", "PROPOSED"]],
     ],
     paint: {
-      "line-color": "#878e80",
+      "line-color": C.proposed,
       "line-width": ["case", ["get", "selected"], 5, 3],
       "line-dasharray": [3, 2],
+      "line-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -270,10 +307,11 @@ function addLayers(m: mapboxgl.Map) {
     filter: ["any", ["get", "selected"], ["get", "review"]],
     paint: {
       "circle-radius": 16,
-      "circle-color": "#faf9f5",
-      "circle-opacity": 0.35,
+      "circle-color": C.stroke,
+      "circle-opacity": 0.12,
       "circle-stroke-color": ["get", "color"],
       "circle-stroke-width": 2,
+      "circle-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -283,8 +321,9 @@ function addLayers(m: mapboxgl.Map) {
     paint: {
       "circle-radius": ["case", ["get", "selected"], 11, 8],
       "circle-color": ["get", "color"],
-      "circle-stroke-color": "#faf9f5",
+      "circle-stroke-color": C.stroke,
       "circle-stroke-width": 2,
+      "circle-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -297,9 +336,10 @@ function addLayers(m: mapboxgl.Map) {
       "text-offset": [0, 1.7],
     },
     paint: {
-      "text-color": "#394136",
-      "text-halo-color": "#faf9f5",
+      "text-color": C.label,
+      "text-halo-color": C.halo,
       "text-halo-width": 2,
+      "text-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -312,15 +352,16 @@ function addLayers(m: mapboxgl.Map) {
         "match",
         ["get", "status"],
         "idle",
-        "#648497",
+        C.idle,
         "en_route",
-        "#4f7056",
+        C.enRoute,
         "on_scene",
-        "#88718c",
-        "#91988b",
+        C.onScene,
+        C.offline,
       ],
-      "circle-stroke-color": "#faf9f5",
+      "circle-stroke-color": C.halo,
       "circle-stroke-width": 2,
+      "circle-emissive-strength": GLOW,
     },
   });
   m.addLayer({
@@ -333,9 +374,10 @@ function addLayers(m: mapboxgl.Map) {
       "text-offset": [0, 1.5],
     },
     paint: {
-      "text-color": "#526a76",
-      "text-halo-color": "#faf9f5",
+      "text-color": C.idle,
+      "text-halo-color": C.halo,
       "text-halo-width": 2,
+      "text-emissive-strength": GLOW,
     },
   });
 }
@@ -376,7 +418,14 @@ export default function MapView({
       m = new mapboxgl.Map({
         container: container.current,
         accessToken: token,
-        style: "mapbox://styles/mapbox/light-v11",
+        style: "mapbox://styles/mapbox/standard",
+        config: {
+          basemap: {
+            theme: "custom",
+            "theme-data": MAP_THEME_LUT,
+            lightPreset: "night",
+          },
+        },
         center: [91.765, 26.165],
         zoom: 12.6,
         attributionControl: false,
@@ -546,40 +595,40 @@ export default function MapView({
       )}
       <div className="map-legend" aria-label="Map legend">
         <span>
-          <i className="bg-red-400" /> Critical ≥70
+          <i style={{ background: C.critical }} /> Critical ≥70
         </span>
         <span>
-          <i className="bg-amber-400" /> Priority ≥40
+          <i style={{ background: C.urgent }} /> Priority ≥40
         </span>
         <span>
-          <i className="bg-yellow-400" /> Priority &lt;40
+          <i style={{ background: C.routine }} /> Priority &lt;40
         </span>
         <span>
-          <i className="bg-slate-400" /> ? Review
+          <i style={{ background: C.review }} /> ? Review
         </span>
         <span>
-          <b className="bg-emerald-400" /> Active route
+          <b style={{ background: C.route }} /> Active route
         </span>
         <span>
           <b className="legend-dashed" /> Proposed route
         </span>
         <span>
-          <b className="bg-amber-400" /> Rerouting
+          <b style={{ background: C.rerouting }} /> Rerouting
         </span>
         <span>
-          <b className="bg-red-400" /> Previous route
+          <b style={{ background: C.previous }} /> Previous route
         </span>
         <span>
-          <i className="bg-blue-500" /> Flood zone
+          <i style={{ background: C.flood }} /> Flood zone
         </span>
         <span>
-          <b className="bg-orange-400" /> Blocked road
+          <b style={{ background: C.blocked }} /> Blocked road
         </span>
         <span>
-          <i className="bg-sky-400" /> Idle volunteer
+          <i style={{ background: C.idle }} /> Idle volunteer
         </span>
         <span>
-          <i className="bg-violet-400" /> On scene
+          <i style={{ background: C.onScene }} /> On scene
         </span>
       </div>
       {(hazard || volunteer || report) && (
