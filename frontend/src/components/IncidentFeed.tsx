@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef } from "react";
 import type { OpsState, Report } from "@/lib/types";
-import { percent, label, eta } from "@/lib/format";
+import { percent, eta } from "@/lib/format";
+import { needText, sourceText, statusText } from "@/lib/copy";
 import { useHighlight } from "@/lib/useHighlight";
 import GovernanceBadge from "./GovernanceBadge";
 
@@ -27,20 +28,17 @@ export default function IncidentFeed(props: Props) {
   return (
     <div className="incident-feed">
       <div className="panel-heading">
-        <h2>Live incident feed</h2>
-        <span className="count-badge">{reports.length} incidents</span>
-      </div>
-      <div className="feed-subtitle">
-        PRIORITY ↓ <span>BACKEND STATE</span>
+        <h2>Incidents</h2>
+        <span className="count-badge">
+          {reports.length} open, most urgent first
+        </span>
       </div>
       {!props.state ? (
-        <p className="empty-state">Loading reports…</p>
+        <p className="muted panel-pad">Loading incidents…</p>
       ) : reports.length === 0 && orphaned.length === 0 ? (
         <p className="empty-state">
-          No incident reports yet.
-          <span className="block mt-1 text-slate-600">
-            Start a scenario or submit a report.
-          </span>
+          <strong>No incidents yet</strong>
+          Play the demo above, or report one below.
         </p>
       ) : (
         [...reports, ...orphaned].map((report) => (
@@ -55,6 +53,8 @@ export default function IncidentFeed(props: Props) {
     </div>
   );
 }
+const needIcon = (need: Report["need_type"]) =>
+  need === "rescue" ? "⛑" : need === "medical" ? "✚" : need === "food" ? "◍" : "?";
 export function IncidentCard({
   report,
   state,
@@ -84,6 +84,19 @@ export function IncidentCard({
           : (report.priority_score ?? 0) >= 40
             ? "urgent"
             : "routine";
+  const waiting = ["AWAITING_APPROVAL", "NEEDS_REVIEW"].includes(
+    report.workflow_status,
+  );
+  const statusTone =
+    report.workflow_status === "AWAITING_APPROVAL"
+      ? "badge-amber"
+      : report.workflow_status === "DISPATCHED" ||
+          report.workflow_status === "COMPLETED"
+        ? "badge-green"
+        : report.workflow_status === "FAILED" ||
+            report.workflow_status === "REJECTED"
+          ? "badge-red"
+          : "badge-slate";
   return (
     <article
       ref={ref}
@@ -95,73 +108,78 @@ export function IncidentCard({
         aria-pressed={selected}
         onClick={() => onSelect(report.merged_into ?? report.id)}
       >
-        <div className="flex justify-between items-center gap-2">
-          <span className="font-mono text-xs text-slate-300">{report.id}</span>
-          <span className="badge badge-slate">
-            {label(report.source_type).toUpperCase()}
-          </span>
+        <div className="incident-top">
+          <span>{report.id}</span>
+          <span>From {sourceText[report.source_type].toLowerCase()} source</span>
         </div>
         <h3 className="incident-location">
-          {report.location_text ?? "Location unresolved"}
+          {report.location_text ?? "Location not clear yet"}
         </h3>
-        <p className="line-clamp-2 text-xs leading-relaxed text-slate-400">
-          {report.raw_text}
-        </p>
+        <p className="incident-text">“{report.raw_text}”</p>
       </button>
       <div className="incident-metrics">
-        <span className="need-label">
-          <span aria-hidden="true">
-            {report.need_type === "rescue"
-              ? "◈"
-              : report.need_type === "medical"
-                ? "+"
-                : report.need_type === "food"
-                  ? "▤"
-                  : "?"}
-          </span>{" "}
-          {report.need_type?.toUpperCase() ?? "UNKNOWN"}
+        <span className={`need-label need-${report.need_type ?? "unknown"}`}>
+          <span className="need-icon" aria-hidden="true">
+            {needIcon(report.need_type)}
+          </span>
+          {needText(report.need_type)}
         </span>
         <ScoreBreakdown report={report} />
         <TrustBreakdown report={report} />
       </div>
-      <div className="flex flex-wrap items-center gap-1.5 mt-2">
-        <span
-          className={`badge ${report.workflow_status === "AWAITING_APPROVAL" ? "badge-amber" : report.workflow_status === "DISPATCHED" || report.workflow_status === "COMPLETED" ? "badge-green" : report.workflow_status === "FAILED" || report.workflow_status === "REJECTED" ? "badge-red" : "badge-slate"}`}
-        >
-          {label(report.workflow_status)}
+      <div className="incident-status">
+        <span className={`badge ${statusTone}`}>
+          {statusText[report.workflow_status]}
+          {waiting && report.policy_rule && (
+            <span className="rule">rule {report.policy_rule}</span>
+          )}
         </span>
-      </div>
-      <div className="mt-2">
-        <GovernanceBadge
-          decision={report.policy_decision}
-          rule={report.policy_rule}
-        />
+        {/* when waiting, the status already says why; otherwise show the decision */}
+        {!waiting &&
+          (report.policy_decision === "APPROVAL_REQUIRED" &&
+          ["DISPATCHED", "IN_PROGRESS", "COMPLETED"].includes(
+            report.workflow_status,
+          ) ? (
+            <span className="badge badge-green">
+              Approved by a dispatcher
+              {report.policy_rule && (
+                <span className="rule">rule {report.policy_rule}</span>
+              )}
+            </span>
+          ) : (
+            <GovernanceBadge
+              decision={report.policy_decision}
+              rule={report.policy_rule}
+            />
+          ))}
       </div>
       {assignment && (
-        <div className="mt-2 flex justify-between font-mono text-xs">
-          <span className="text-emerald-300">
-            {assignment.volunteer_id} · {label(assignment.status)}
+        <div className="incident-assignment">
+          <span>
+            <b>{assignment.volunteer_id}</b>{" "}
+            {assignment.status === "AWAITING_APPROVAL"
+              ? "suggested"
+              : "on the way"}
           </span>
-          <span className="text-slate-300">
-            ETA {eta(assignment.route_eta_seconds)}
-          </span>
+          <span>{eta(assignment.route_eta_seconds)} away</span>
         </div>
       )}
       {report.duplicate_count > 0 && (
         <details className="duplicates">
-          <summary className="text-xs text-blue-300">
-            +{report.duplicate_count} duplicate
-            {report.duplicate_count === 1 ? "" : "s"} merged
+          <summary>
+            {report.duplicate_count === 1
+              ? "1 more person reported this"
+              : `${report.duplicate_count} more people reported this`}
           </summary>
           {children.length ? (
             children.map((r) => (
               <p className="mt-2 muted" key={r.id}>
-                <span className="font-mono">{r.id}</span> · {r.raw_text}
+                {r.id}: “{r.raw_text}”
               </p>
             ))
           ) : (
             <p className="muted mt-1">
-              Duplicate details not available in this snapshot.
+              The duplicate reports aren’t loaded yet.
             </p>
           )}
         </details>
@@ -175,27 +193,25 @@ function ScoreBreakdown({ report }: { report: Report }) {
     <div
       className="metric-tooltip"
       tabIndex={0}
-      aria-label={`Priority ${report.priority_score ?? "unscored"}`}
+      aria-label={`Urgency ${report.priority_score ?? "not scored yet"} out of 100`}
     >
-      <span className="metric-label">PRI</span>
-      <strong className="font-mono score">
-        {report.priority_score ?? "—"}
-      </strong>
+      <span className="metric-label">Urgency</span>
+      <strong className="score">{report.priority_score ?? "—"}</strong>
       <div className="score-tooltip">
-        <div className="section-label">PRIORITY BREAKDOWN</div>
+        <div className="section-label">How urgency is scored (out of 100)</div>
         {b ? (
           <>
             <p>
-              Severity <b>{b.severity}/50</b>
+              How serious <b>{b.severity}/50</b>
             </p>
             <p>
-              Wait time <b>{b.wait_time}/20</b>
+              Time waiting <b>{b.wait_time}/20</b>
             </p>
             <p>
-              Vulnerability <b>{b.vulnerability}/20</b>
+              Vulnerable people <b>{b.vulnerability}/20</b>
             </p>
             <p>
-              Hazard <b>{b.hazard_escalation}/10</b>
+              Near flooding <b>{b.hazard_escalation}/10</b>
             </p>
             <p>
               Total <b>{b.total}/100</b>
@@ -216,16 +232,14 @@ function TrustBreakdown({ report }: { report: Report }) {
       tabIndex={0}
       aria-label={`Trust ${percent(report.trust_score)}`}
     >
-      <span className="metric-label">TRUST</span>
-      <strong className="font-mono text-slate-200">
-        {percent(report.trust_score)}
-      </strong>
+      <span className="metric-label">Trust</span>
+      <strong>{percent(report.trust_score)}</strong>
       <div className="score-tooltip">
-        <div className="section-label">TRUST BREAKDOWN</div>
+        <div className="section-label">How much we trust this report</div>
         {b ? (
           <>
             <p>
-              Source base <b>{percent(b.base)}</b>
+              Starting point for this source <b>{percent(b.base)}</b>
             </p>
             {b.modifiers.map((m, i) => (
               <p key={i}>
@@ -237,11 +251,11 @@ function TrustBreakdown({ report }: { report: Report }) {
               </p>
             ))}
             <p>
-              Final score <b>{percent(b.score)}</b>
+              Final trust <b>{percent(b.score)}</b>
             </p>
           </>
         ) : (
-          <p>Not evaluated yet.</p>
+          <p>Not checked yet.</p>
         )}
       </div>
     </div>

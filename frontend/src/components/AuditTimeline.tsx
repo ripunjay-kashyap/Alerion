@@ -2,6 +2,7 @@
 import { useState } from "react";
 import type { AuditEntry } from "@/lib/types";
 import { stageOf, stages, type Stage } from "@/lib/audit";
+import { eventText, stageText } from "@/lib/copy";
 import { clockTime } from "@/lib/format";
 import { ActorBadge } from "./AuditDetails";
 
@@ -29,12 +30,12 @@ export default function AuditTimeline({
   return (
     <div className="timeline-panel">
       <div className="timeline-toolbar">
-        <div className="mode-toggle">
+        <div className="mode-toggle" role="group" aria-label="Which entries">
           <button
             className={scope === "all" ? "active" : ""}
             onClick={() => setScope("all")}
           >
-            All
+            Everything
           </button>
           <button
             className={scope === "selected" ? "active" : ""}
@@ -45,18 +46,18 @@ export default function AuditTimeline({
           </button>
         </div>
         <select
-          aria-label="Filter audit by stage"
+          aria-label="Filter the log by step"
           value={stage}
           onChange={(e) => setStage(e.target.value as Stage | "all")}
         >
-          <option value="all">All stages</option>
+          <option value="all">All steps</option>
           {stages.map((stage) => (
             <option key={stage} value={stage}>
-              {stage}
+              {stageText[stage]}
             </option>
           ))}
         </select>
-        <span className="font-mono muted">{entries.length} events</span>
+        <span className="muted">{entries.length} entries</span>
       </div>
       <div className="audit-scroll">
         {entries.length ? (
@@ -65,24 +66,24 @@ export default function AuditTimeline({
               key={e.seq}
               className={`audit-row stage-${stageOf(e.event_type).toLowerCase()}`}
             >
-              <time className="font-mono muted">{clockTime(e.created_at)}</time>
+              <time>{clockTime(e.created_at)}</time>
               <ActorBadge entry={e} />
-              <span className="font-mono text-xs">{e.event_type}</span>
-              <p>{e.message}</p>
-              {e.policy_rule && (
-                <span className="badge badge-amber font-mono">
-                  {e.policy_rule}
-                </span>
+              <span className="event-name">{eventText(e.event_type)}</span>
+              {e.policy_rule ? (
+                <span className="badge badge-amber">rule {e.policy_rule}</span>
+              ) : (
+                <span />
               )}
+              <p>{e.message}</p>
             </div>
           ))
         ) : (
-          <p className="empty-state">
+          <p className="muted p-4">
             {loading
-              ? "Loading audit events…"
+              ? "Loading the log…"
               : scope === "selected" && !selectedReportId
-                ? "Select an incident to filter the audit."
-                : "No audit events for this filter."}
+                ? "Pick an incident to filter the log."
+                : "Nothing logged for this filter yet."}
           </p>
         )}
       </div>

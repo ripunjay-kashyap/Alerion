@@ -4,7 +4,8 @@ import { api } from "@/lib/api";
 import { useAction } from "@/lib/useAction";
 import { useHighlight } from "@/lib/useHighlight";
 import type { Approval, OpsState, ReviewCorrections } from "@/lib/types";
-import { eta, label, percent } from "@/lib/format";
+import { eta, percent } from "@/lib/format";
+import { approvalTitle, needText, sourceText } from "@/lib/copy";
 import VolunteerFunnel from "./VolunteerFunnel";
 
 interface Props {
@@ -37,20 +38,19 @@ export default function ApprovalQueue(props: Props) {
   return (
     <div>
       <div className="panel-heading">
-        <h2>Governance · approvals</h2>
-        <span className="count-badge text-amber-300">
-          {pending.length} pending
+        <h2>Your decisions</h2>
+        <span className={`count-badge ${pending.length ? "attention" : ""}`}>
+          {pending.length} waiting
         </span>
       </div>
       {!props.state ? (
-        <p className="empty-state">Loading approval queue…</p>
+        <p className="muted panel-pad">Loading…</p>
       ) : pending.length === 0 ? (
-        <div className="empty-state">
-          No approvals pending.
-          <span className="block mt-1 text-slate-600">
-            Governed decisions will appear here.
-          </span>
-        </div>
+        <p className="empty-state">
+          <strong>Nothing needs you right now</strong>
+          Dispatches from unverified sources and unclear reports will wait here
+          for your approval.
+        </p>
       ) : (
         pending.map((approval) => (
           <ApprovalCard
@@ -63,28 +63,23 @@ export default function ApprovalQueue(props: Props) {
       )}
       {resolved.length > 0 && (
         <details className="history-list">
-          <summary className="section-label">
-            Resolved history · {resolved.length}
-          </summary>
+          <summary>Decided earlier ({resolved.length})</summary>
           {resolved.map((a) => (
             <button
               key={a.id}
               className="history-row"
               onClick={() => props.onSelect(a.report_id)}
             >
-              <span className="font-mono">
-                {a.id} · {a.report_id}
-              </span>
+              <span>{a.report_id}</span>
               <span
                 className={
                   a.status === "APPROVED" ? "text-emerald-300" : "text-red-300"
                 }
               >
-                {a.status}
+                {a.status === "APPROVED" ? "Approved" : "Rejected"}
               </span>
               <span className="muted col-span-2">
-                {a.resolution_note ??
-                  `${label(a.action_type)} ${a.status.toLowerCase()} by ${a.approved_by ?? "dispatcher"}`}
+                {a.resolution_note ?? approvalTitle[a.action_type]}
               </span>
             </button>
           ))}
@@ -127,18 +122,18 @@ export function ApprovalCard({
   const review = approval.action_type === "review";
   async function approve(form: React.FormEvent<HTMLFormElement>) {
     form.preventDefault();
-    const corrections: ReviewCorrections | undefined = review
-      ? {
-          location_text: location.trim(),
-          latitude: Number(latitude),
-          longitude: Number(longitude),
-          need_type: need,
-        }
-      : undefined;
+    // Send only what the dispatcher filled in; the backend geocodes known places.
+    const corrections: ReviewCorrections = {};
+    if (location.trim()) corrections.location_text = location.trim();
+    if (latitude.trim() && longitude.trim()) {
+      corrections.latitude = Number(latitude);
+      corrections.longitude = Number(longitude);
+    }
+    if (need) corrections.need_type = need;
     await action.execute(() =>
       api.approve(approval.id, {
         ...(note.trim() ? { note: note.trim() } : {}),
-        ...(corrections ? { corrections } : {}),
+        ...(review ? { corrections } : {}),
       }),
     );
   }
@@ -147,64 +142,63 @@ export function ApprovalCard({
       ref={card}
       className={`approval-card ${approval.report_id === selectedReportId ? "selected" : ""}`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="badge badge-amber">
-          {approval.action_type.toUpperCase()}
-        </span>
-        {approval.policy_rule && (
-          <span className="badge badge-amber font-mono">
-            {approval.policy_rule}
-          </span>
-        )}
-      </div>
       <button
-        className="text-left mt-3 w-full"
+        className="text-left w-full"
         onClick={() => onSelect(approval.report_id)}
       >
-        <span className="font-mono text-xs text-slate-500">
-          {approval.id} / {approval.report_id}
-        </span>
-        <h3 className="mt-1 font-semibold">
-          {report?.location_text ?? "Unresolved location"}
+        <div className="flex items-center justify-between gap-2">
+          <span className="badge badge-amber">
+            {approvalTitle[approval.action_type]}
+          </span>
+          <span className="muted">{approval.report_id}</span>
+        </div>
+        <h3 className="mt-2">
+          {report?.location_text ?? "Location not clear yet"}
         </h3>
       </button>
-      <p className="mt-2 text-xs text-slate-300">{approval.reason}</p>
+      <p className="approval-reason" title={approval.reason}>
+        {approval.policy_rule === "GOV-01"
+          ? "Someone’s life may be at risk, but the report comes from a source we can’t verify yet. A person should confirm before a responder goes."
+          : approval.policy_rule === "UNC-01"
+            ? "We couldn’t tell where this is or what help is needed, so nobody was sent. Fill in what’s missing and it continues automatically."
+            : approval.action_type === "escalation"
+              ? "No responder can reach this safely right now. Approve to try again with whoever is free."
+              : approval.reason}
+      </p>
       {report && (
         <>
           <div className="approval-metrics">
-            <span>{report.need_type?.toUpperCase() ?? "UNKNOWN NEED"}</span>
-            <span className="font-mono">
-              PRI{" "}
-              <b className="text-amber-300">{report.priority_score ?? "—"}</b>
+            <span>{needText(report.need_type)}</span>
+            <span>
+              Urgency <b>{report.priority_score ?? "—"}</b>
             </span>
-            <span className="font-mono">
-              TRUST {percent(report.trust_score)}
+            <span>
+              Trust <b>{percent(report.trust_score)}</b>
+            </span>
+            <span>
+              {sourceText[report.source_type]},{" "}
+              {report.people_affected ?? "unknown number of"}{" "}
+              {report.people_affected === 1 ? "person" : "people"}
             </span>
           </div>
-          <p className="muted">
-            {label(report.source_type)} · {report.people_affected ?? "Unknown"}{" "}
-            people
-          </p>
-          <p className="line-clamp-2 text-xs text-slate-400 mt-2">
-            {report.raw_text}
-          </p>
+          <p className="incident-text">“{report.raw_text}”</p>
         </>
       )}
       {assignment && (
         <div className="proposed-volunteer">
-          <div className="section-label">PROPOSED VOLUNTEER</div>
-          <div className="flex justify-between font-mono text-sm">
+          <div className="section-label">Suggested responder</div>
+          <div className="proposed-volunteer-head">
             <span>
-              {assignment.volunteer_id}{" "}
-              <span className="text-emerald-300">
-                {volunteer?.medical_certified ? "✓ certified" : ""}
-              </span>
+              {volunteer?.name ?? assignment.volunteer_id}{" "}
+              <span className="muted">({assignment.volunteer_id})</span>
             </span>
             <span>{eta(assignment.route_eta_seconds)}</span>
           </div>
-          <p className="muted">{volunteer?.name}</p>
-          <p className="mt-2 text-xs text-slate-300">
-            {assignment.explanation ?? "Dispatch explanation not available."}
+          {volunteer?.medical_certified && (
+            <span className="badge badge-green mt-1">Medically certified</span>
+          )}
+          <p className="muted mt-2">
+            {assignment.explanation ?? "No explanation recorded."}
           </p>
           <VolunteerFunnel
             selection={assignment.selection}
@@ -215,38 +209,38 @@ export function ApprovalCard({
       <form onSubmit={approve} className="mt-3">
         {review && (
           <fieldset disabled={action.pending} className="review-fields">
-            <legend className="section-label">CORRECT INTAKE DETAILS</legend>
+            <legend className="section-label">
+              Fill in what the report was missing
+            </legend>
             <label>
-              Location
+              Where is it?
               <input
                 required
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="Landmark / locality"
+                placeholder="A landmark or area, e.g. Pan Bazar"
               />
             </label>
             <div className="grid grid-cols-2 gap-2">
               <label>
-                Latitude
+                Latitude (optional)
                 <input
                   type="number"
                   step="any"
                   min="-90"
                   max="90"
-                  required
                   value={latitude}
                   onChange={(e) => setLatitude(e.target.value)}
                   placeholder="26.1890"
                 />
               </label>
               <label>
-                Longitude
+                Longitude (optional)
                 <input
                   type="number"
                   step="any"
                   min="-180"
                   max="180"
-                  required
                   value={longitude}
                   onChange={(e) => setLongitude(e.target.value)}
                   placeholder="91.7530"
@@ -254,7 +248,7 @@ export function ApprovalCard({
               </label>
             </div>
             <label>
-              Need type
+              What kind of help?
               <select
                 required
                 value={need ?? ""}
@@ -262,7 +256,7 @@ export function ApprovalCard({
                   setNeed(e.target.value as ReviewCorrections["need_type"])
                 }
               >
-                <option value="">Select need</option>
+                <option value="">Choose one</option>
                 <option value="rescue">Rescue</option>
                 <option value="medical">Medical</option>
                 <option value="food">Food & water</option>
@@ -271,12 +265,12 @@ export function ApprovalCard({
           </fieldset>
         )}
         <label className="field-label">
-          Resolution note <span className="muted">(optional)</span>
+          Note (optional)
           <input
             value={note}
             maxLength={1000}
             onChange={(e) => setNote(e.target.value)}
-            placeholder="Dispatcher note"
+            placeholder="e.g. Confirmed by phone"
             disabled={action.pending}
           />
         </label>
@@ -284,21 +278,23 @@ export function ApprovalCard({
           <div role="alert" className="inline-error">
             {action.error.message}{" "}
             {action.error.policyRule && (
-              <span className="badge badge-red">{action.error.policyRule}</span>
+              <span className="badge badge-red">
+                Rule {action.error.policyRule}
+              </span>
             )}
           </div>
         )}
         <div className="flex gap-2 mt-3">
           <button
             type="submit"
-            className="button button-emerald flex-1"
+            className="button button-go flex-1"
             disabled={action.pending}
           >
             {action.pending
-              ? "Resolving…"
+              ? "Saving…"
               : review
-                ? "Approve corrections"
-                : "Approve"}
+                ? "Save and continue"
+                : "Approve dispatch"}
           </button>
           <button
             type="button"

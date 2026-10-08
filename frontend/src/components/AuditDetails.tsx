@@ -1,23 +1,19 @@
 import type { AuditEntry } from "@/lib/types";
+import { actorText, eventText } from "@/lib/copy";
 import { clockTime } from "@/lib/format";
 
-const actorLabels: Record<string, string> = {
-  "intake-stage": "INTAKE",
-  "triage-stage": "TRIAGE",
-  "dispatch-stage": "DISPATCH",
-  "policy-engine": "POLICY",
-  "safety-monitor": "SAFETY",
-};
 export function ActorBadge({ entry }: { entry: AuditEntry }) {
-  const actor =
+  const actor = actorText(entry);
+  const tone =
     entry.actor_type === "human"
-      ? "HUMAN"
-      : (actorLabels[entry.actor_id] ?? "SYSTEM");
+      ? "badge-blue"
+      : actor === "Safety"
+        ? "badge-red"
+        : actor === "Rules"
+          ? "badge-amber"
+          : "badge-slate";
   return (
-    <span
-      title={entry.actor_id}
-      className={`badge ${actor === "HUMAN" ? "badge-blue" : actor === "SAFETY" ? "badge-red" : "badge-slate"}`}
-    >
+    <span title={entry.actor_id} className={`badge ${tone}`}>
       {actor}
     </span>
   );
@@ -26,25 +22,20 @@ export default function AuditDetails({ entry }: { entry: AuditEntry }) {
   return (
     <div className="audit-detail">
       <div className="flex flex-wrap items-center gap-2">
-        <time className="font-mono muted">{clockTime(entry.created_at)}</time>
+        <time className="muted">{clockTime(entry.created_at)}</time>
         <ActorBadge entry={entry} />
-        <span className="font-mono text-xs text-slate-400">
-          {entry.event_type}
-        </span>
+        <b>{eventText(entry.event_type)}</b>
         {entry.policy_rule && (
-          <span className="badge badge-amber font-mono">
-            {entry.policy_rule}
-          </span>
+          <span className="badge badge-amber">rule {entry.policy_rule}</span>
         )}
       </div>
-      <p className="mt-2 text-xs">{entry.message}</p>
-      <p className="muted font-mono mt-1">{entry.actor_id}</p>
+      <p className="mt-2">{entry.message}</p>
       {(["input_snapshot", "output_snapshot"] as const).map(
         (key) =>
           entry[key] && (
             <details key={key} className="snapshot">
               <summary>
-                {key === "input_snapshot" ? "Input" : "Output"} snapshot
+                {key === "input_snapshot" ? "What went in" : "What came out"}
               </summary>
               <pre>{JSON.stringify(entry[key], null, 2)}</pre>
             </details>

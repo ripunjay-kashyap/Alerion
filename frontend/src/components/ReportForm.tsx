@@ -37,7 +37,7 @@ export default function ReportForm({
   const action = useAction(onError, refresh);
   return (
     <details className="report-form">
-      <summary className="section-label">+ SUBMIT INCIDENT REPORT</summary>
+      <summary>Report an incident</summary>
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -51,7 +51,8 @@ export default function ReportForm({
           );
         }}
       >
-        <div className="flex gap-2 mt-3 mb-3">
+        <div className="sample-row">
+          <span className="muted">Try an example:</span>
           {samples.map((sample) => (
             <button
               type="button"
@@ -64,12 +65,12 @@ export default function ReportForm({
                 setSubmitted(null);
               }}
             >
-              {sample.label} sample
+              {sample.label}
             </button>
           ))}
         </div>
         <label className="field-label">
-          Incident report
+          What’s happening?
           <textarea
             rows={4}
             required
@@ -77,20 +78,20 @@ export default function ReportForm({
             disabled={action.pending || disabled}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder="What happened, where, who needs help?"
+            placeholder="Who needs help, where, and what’s going on?"
           />
         </label>
         <label className="field-label mt-2">
-          Source
+          Who is reporting it?
           <select
             value={source}
             disabled={action.pending || disabled}
             onChange={(e) => setSource(e.target.value as SourceType)}
           >
-            <option value="official">Official</option>
+            <option value="official">Official (control room, rescue force)</option>
             <option value="verified_operator">Verified operator</option>
-            <option value="citizen">Citizen</option>
-            <option value="anonymous">Anonymous</option>
+            <option value="citizen">A member of the public</option>
+            <option value="anonymous">Anonymous caller</option>
           </select>
         </label>
         {action.error && (
@@ -99,14 +100,14 @@ export default function ReportForm({
           </p>
         )}
         <button
-          className="button button-emerald w-full mt-3"
+          className="button button-primary w-full mt-3"
           disabled={action.pending || disabled || !text.trim()}
         >
-          {action.pending ? "Submitting…" : "Submit report"}
+          {action.pending ? "Sending…" : "Send report"}
         </button>
         {submitted && (
           <p className="mt-2 text-xs text-emerald-300" role="status">
-            Report accepted · <span className="font-mono">{submitted}</span>
+            Report sent as {submitted}. Watch it move through the steps below.
           </p>
         )}
       </form>

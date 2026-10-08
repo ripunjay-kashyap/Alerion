@@ -56,49 +56,60 @@ export default function ScenarioControls({
   const current =
     scenario?.status === system?.scenario_status ? scenario : null;
   const disabled = !system || action.pending || running;
+  const stepping = running && current?.mode === "manual";
+  const next = current?.events[current.next_event_index];
   return (
-    <div className="scenario-controls">
-      <span className="section-label">SCENARIO</span>
-      <button
-        className="button button-emerald"
-        disabled={disabled}
-        onClick={() => void run(() => api.startScenario("timed"))}
-      >
-        ▶ Start timed
-      </button>
-      <button
-        className="button"
-        disabled={disabled}
-        onClick={() => void run(() => api.startScenario("manual"))}
-      >
-        Start manual
-      </button>
-      <button
-        className="button button-amber"
-        disabled={!running || action.pending || current?.mode !== "manual"}
-        title={current?.events[current.next_event_index]?.label}
-        onClick={() => void run(api.nextScenarioEvent)}
-      >
-        Next event →
-      </button>
-      <span className="scenario-progress font-mono" aria-live="polite">
-        {current
-          ? `${current.next_event_index}/${current.total_events} · ${current.elapsed_s}s · ${current.status.toUpperCase()}`
-          : system
-            ? system.scenario_status.toUpperCase()
-            : "LOADING"}
-      </span>
+    <div className="scenario-controls" aria-label="Demo scenario">
+      {stepping ? (
+        <button
+          className="button button-primary"
+          disabled={action.pending}
+          title={next?.label}
+          onClick={() => void run(api.nextScenarioEvent)}
+        >
+          Next step
+        </button>
+      ) : (
+        <>
+          <button
+            className="button button-primary"
+            disabled={disabled}
+            onClick={() => void run(() => api.startScenario("timed"))}
+          >
+            Run demo
+          </button>
+          <button
+            className="button"
+            disabled={disabled}
+            onClick={() => void run(() => api.startScenario("manual"))}
+          >
+            Step through
+          </button>
+        </>
+      )}
+      {current && current.status !== "idle" && (
+        <span className="scenario-progress" aria-live="polite">
+          <span className="scenario-steps" aria-hidden="true">
+            {current.events.map((e, i) => (
+              <i key={i} className={e.fired ? "fired" : ""} />
+            ))}
+          </span>
+          {current.status === "done"
+            ? "Demo finished"
+            : `Step ${current.next_event_index} of ${current.total_events}`}
+        </span>
+      )}
       {error && (
-        <span className="text-xs text-red-300" title={error}>
-          Scenario unavailable
+        <span className="scenario-error" title={error}>
+          Demo unavailable
         </span>
       )}
       <button
-        className="button button-danger ml-auto"
+        className="button button-quiet"
         disabled={!system || action.pending}
         onClick={() => void action.execute(api.resetScenario)}
       >
-        ↺ Reset
+        Reset
       </button>
     </div>
   );

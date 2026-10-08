@@ -8,6 +8,7 @@ import { api } from "@/lib/api";
 import VolunteerFunnel from "./VolunteerFunnel";
 import { ApiError, errorMessage } from "@/lib/errors";
 import { MAP_THEME_LUT } from "@/lib/mapTheme";
+import { needText, statusText } from "@/lib/copy";
 
 type Popup = {
   kind: "hazard" | "volunteer";
@@ -578,45 +579,44 @@ export default function MapView({
         />
       )}
       <div className="map-title">
-        <span className="status-dot bg-blue-400" /> GUWAHATI · FLOOD OPERATIONS{" "}
-        <span className="text-slate-500">26.165° N / 91.765° E</span>
+        Guwahati tonight <span>Click a pin or a flood zone for details</span>
       </div>
       {(!hasToken || mapError) && (
         <div className="map-fallback-note">
-          Coordinate view ·{" "}
+          Simplified map:{" "}
           {mapError
-            ? "Mapbox unavailable"
-            : "Set NEXT_PUBLIC_MAPBOX_TOKEN for street map"}
+            ? "the street map couldn’t load"
+            : "add NEXT_PUBLIC_MAPBOX_TOKEN for the street map"}
         </div>
       )}
-      {!state && <div className="map-loading">Loading operational state…</div>}
+      {!state && <div className="map-loading">Loading incidents…</div>}
       {state && hasToken && !mapReady && !mapError && (
-        <div className="map-loading">Loading street map…</div>
+        <div className="map-loading">Loading the street map…</div>
       )}
       <div className="map-legend" aria-label="Map legend">
         <span>
-          <i style={{ background: C.critical }} /> Critical ≥70
+          <i style={{ background: C.critical }} /> Critical (70+)
         </span>
         <span>
-          <i style={{ background: C.urgent }} /> Priority ≥40
+          <i style={{ background: C.urgent }} /> Urgent (40+)
         </span>
         <span>
-          <i style={{ background: C.routine }} /> Priority &lt;40
+          <i style={{ background: C.routine }} /> Routine
         </span>
         <span>
-          <i style={{ background: C.review }} /> ? Review
+          <i style={{ background: C.review }} /> Needs a human check
         </span>
         <span>
-          <b style={{ background: C.route }} /> Active route
+          <b style={{ background: C.route }} /> Responder route
         </span>
         <span>
-          <b className="legend-dashed" /> Proposed route
+          <b className="legend-dashed" /> Waiting for approval
         </span>
         <span>
           <b style={{ background: C.rerouting }} /> Rerouting
         </span>
         <span>
-          <b style={{ background: C.previous }} /> Previous route
+          <b style={{ background: C.previous }} /> Old route
         </span>
         <span>
           <i style={{ background: C.flood }} /> Flood zone
@@ -625,7 +625,7 @@ export default function MapView({
           <b style={{ background: C.blocked }} /> Blocked road
         </span>
         <span>
-          <i style={{ background: C.idle }} /> Idle volunteer
+          <i style={{ background: C.idle }} /> Available responder
         </span>
         <span>
           <i style={{ background: C.onScene }} /> On scene
@@ -645,15 +645,13 @@ export default function MapView({
           </button>
           {hazard && (
             <>
-              <div className="section-label">
-                {hazard.active ? "ACTIVE HAZARD" : "INACTIVE HAZARD"}
-              </div>
-              <h3 className="font-mono text-blue-300">
-                {hazard.id} · {hazard.severity.toUpperCase()}
-              </h3>
-              <p>{hazard.label}</p>
+              <span className={`badge ${hazard.active ? "badge-blue" : "badge-slate"}`}>
+                {hazard.kind === "blocked_road" ? "Blocked road" : "Flood zone"}
+                {hazard.active ? ", active" : ", not active"}
+              </span>
+              <h3>{hazard.label}</h3>
               <p className="muted">
-                {hazard.kind.replaceAll("_", " ")} · {hazard.source}
+                {hazard.id}, {hazard.severity} severity
               </p>
               <button
                 className={hazard.active ? "button" : "button button-amber"}
@@ -663,61 +661,69 @@ export default function MapView({
                 {pending
                   ? "Updating…"
                   : hazard.active
-                    ? "Deactivate hazard"
-                    : "Activate hazard"}
+                    ? "Mark as cleared"
+                    : "Activate this flood zone"}
               </button>
               <p className="muted">
-                Activation checks active routes for flood exposure.
+                Activating it reroutes any responder whose route crosses it.
               </p>
             </>
           )}
           {volunteer && (
             <>
-              <div className="section-label">
-                VOLUNTEER · {volunteer.status.replaceAll("_", " ")}
-              </div>
-              <h3 className="font-mono">
-                {volunteer.id} / {volunteer.callsign}
-              </h3>
-              <p>{volunteer.name}</p>
-              <p>{volunteer.skills.join(" · ")}</p>
+              <span
+                className={`badge ${volunteer.status === "idle" ? "badge-green" : volunteer.status === "offline" ? "badge-slate" : "badge-blue"}`}
+              >
+                {volunteer.status === "idle"
+                  ? "Available"
+                  : volunteer.status === "en_route"
+                    ? "On the way to an incident"
+                    : volunteer.status === "on_scene"
+                      ? "On scene"
+                      : "Off duty"}
+              </span>
+              <h3>{volunteer.name}</h3>
               <p className="muted">
-                {volunteer.vehicle_type} · capacity {volunteer.capacity} ·{" "}
-                {volunteer.medical_certified
-                  ? "Medically certified"
-                  : "No medical certification"}
+                {volunteer.id}, call sign {volunteer.callsign}
               </p>
+              <p>Skills: {volunteer.skills.join(", ").replaceAll("_", " ")}</p>
               <p className="muted">
-                {volunteer.available ? "Available" : "Unavailable"}
+                Drives a {volunteer.vehicle_type}, carries up to{" "}
+                {volunteer.capacity}.{" "}
+                {volunteer.medical_certified
+                  ? "Medically certified."
+                  : "Not medically certified."}
               </p>
             </>
           )}
           {report && (
             <>
-              <div className="section-label">SELECTED INCIDENT</div>
-              <h3 className="font-mono">
-                {report.id} ·{" "}
-                {report.need_type?.toUpperCase() ?? "UNKNOWN NEED"}
-              </h3>
-              <p>{report.location_text ?? "Location unresolved"}</p>
-              <div className="flex gap-4 font-mono">
-                <span>PRI {report.priority_score ?? "—"}</span>
+              <span className="badge badge-slate">
+                {needText(report.need_type)}, {report.id}
+              </span>
+              <h3>{report.location_text ?? "Location not clear yet"}</h3>
+              <div className="popover-stats">
                 <span>
-                  TRUST{" "}
-                  {report.trust_score === null
-                    ? "—"
-                    : `${Math.round(report.trust_score * 100)}%`}
+                  Urgency<b>{report.priority_score ?? "—"}</b>
+                </span>
+                <span>
+                  Trust
+                  <b>
+                    {report.trust_score === null
+                      ? "—"
+                      : `${Math.round(report.trust_score * 100)}%`}
+                  </b>
                 </span>
               </div>
-              <p className="muted">
-                {report.source_type} ·{" "}
-                {report.workflow_status.replaceAll("_", " ")}
-              </p>
+              <p className="muted">{statusText[report.workflow_status]}</p>
               {assignment && (
                 <>
-                  <p className="font-mono text-emerald-300">
-                    {assignment.volunteer_id} · ETA{" "}
-                    {eta(assignment.route_eta_seconds)}
+                  <p className="text-emerald-300">
+                    <b>{assignment.volunteer_id}</b>{" "}
+                    {assignment.status === "AWAITING_APPROVAL"
+                      ? "suggested"
+                      : "on the way"}
+                    , {eta(assignment.route_eta_seconds)} away
                   </p>
                   <p className="muted">{assignment.explanation}</p>
                   <VolunteerFunnel

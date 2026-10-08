@@ -1,7 +1,10 @@
 import type { AuditEntry, Report } from "@/lib/types";
 import { stages, stageOf, stageStatus } from "@/lib/audit";
+import { stageStatusText, stageText } from "@/lib/copy";
 import { clockTime } from "@/lib/format";
 import AuditDetails, { ActorBadge } from "./AuditDetails";
+
+const icon = { done: "✓", blocked: "!", running: "•", pending: "…" } as const;
 
 export default function PipelinePanel({
   report,
@@ -12,8 +15,12 @@ export default function PipelinePanel({
 }) {
   if (!report)
     return (
-      <div className="empty-state">
-        Select an incident to inspect its pipeline.
+      <div className="pipeline-panel">
+        <p className="empty-state">
+          <strong>Pick an incident</strong>
+          Click a card or a pin on the map to see each step the system took,
+          and who took it.
+        </p>
       </div>
     );
   const entries = audit.filter(
@@ -23,9 +30,9 @@ export default function PipelinePanel({
     <div className="pipeline-panel">
       <div className="panel-heading">
         <h2>
-          Pipeline{" "}
-          <span className="font-mono text-slate-300">/ {report.id}</span>
+          Steps for {report.location_text ?? report.id}
         </h2>
+        <span className="muted">{report.id}</span>
       </div>
       <div className="pipeline">
         {stages
@@ -41,25 +48,24 @@ export default function PipelinePanel({
               >
                 <summary>
                   <div className="pipeline-stage-name">
-                    <span>
-                      {status === "done"
-                        ? "✓"
-                        : status === "blocked"
-                          ? "!"
-                          : status === "running"
-                            ? "◉"
-                            : "○"}
-                    </span>{" "}
-                    {stage}
+                    <span className="stage-icon" aria-hidden="true">
+                      {icon[status]}
+                    </span>
+                    {stageText[stage]}
                   </div>
-                  <span className="stage-status">{status.toUpperCase()}</span>
+                  <span className="stage-status">
+                    {stageStatusText[status]}
+                    {latest && (
+                      <>
+                        {" "}
+                        by <ActorBadge entry={latest} />
+                      </>
+                    )}
+                  </span>
                   {latest && (
                     <>
-                      <ActorBadge entry={latest} />
-                      <time className="font-mono muted">
-                        {clockTime(latest.created_at)}
-                      </time>
                       <p title={latest.message}>{latest.message}</p>
+                      <time>{clockTime(latest.created_at)}</time>
                     </>
                   )}
                 </summary>
@@ -69,9 +75,7 @@ export default function PipelinePanel({
                       .reverse()
                       .map((e) => <AuditDetails key={e.seq} entry={e} />)
                   ) : (
-                    <p className="muted">
-                      No {stage.toLowerCase()} events recorded.
-                    </p>
+                    <p className="muted">Nothing here yet.</p>
                   )}
                 </div>
               </details>

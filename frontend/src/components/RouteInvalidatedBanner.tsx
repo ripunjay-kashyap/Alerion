@@ -23,6 +23,7 @@ export default function RouteInvalidatedBanner({
   );
   const reportId = event.report_id ?? assignment?.report_id;
   const newEta = event.new_eta_seconds ?? assignment?.route_eta_seconds;
+  const who = assignment?.volunteer_id ?? "A responder";
   return (
     <div className="route-banner" role="status" aria-live="polite">
       <button
@@ -32,29 +33,27 @@ export default function RouteInvalidatedBanner({
       >
         ×
       </button>
-      <div className="font-mono text-xs font-semibold tracking-wider text-amber-300">
-        ⚠ ROUTE INVALIDATED · {event.assignment_id ?? "ASSIGNMENT"}{" "}
-        {assignment ? `/ ${assignment.volunteer_id}` : ""}
-      </div>
+      <h3>
+        {newEta != null
+          ? `${who} was rerouted around new flooding`
+          : `${who}’s route just flooded`}
+      </h3>
       <p>
-        New hazard <span className="font-mono">{event.hazard_id ?? "—"}</span>{" "}
-        intersects the active route.
+        Flood zone {event.hazard_id ?? "—"} now covers the old route.{" "}
+        {newEta != null
+          ? "A safe way around was found automatically."
+          : "Looking for a safe way around…"}
       </p>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <span className="text-emerald-300">
-          {newEta != null
-            ? "✓ Safe route recalculated"
-            : "Safety monitor recalculating route…"}
+        <span className="eta-change">
+          <s>{eta(event.previous_eta_seconds)}</s> {eta(newEta)}
         </span>
-        <span className="font-mono text-slate-100">
-          ETA {eta(event.previous_eta_seconds)} → {eta(newEta)}
-        </span>
+        {reportId && (
+          <button className="text-link" onClick={() => onSelect(reportId)}>
+            See what happened
+          </button>
+        )}
       </div>
-      {reportId && (
-        <button className="text-link mt-2" onClick={() => onSelect(reportId)}>
-          Inspect incident and audit →
-        </button>
-      )}
     </div>
   );
 }

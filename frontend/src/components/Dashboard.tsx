@@ -9,7 +9,7 @@ import ApprovalQueue from "./ApprovalQueue";
 import GovernanceBadge from "./GovernanceBadge";
 import RouteInvalidatedBanner from "./RouteInvalidatedBanner";
 import ScenarioControls from "./ScenarioControls";
-import SystemStatus, { StatsChips } from "./SystemStatus";
+import SystemStatus, { KpiStrip } from "./SystemStatus";
 import { clockTime } from "@/lib/format";
 import ReportForm from "./ReportForm";
 import PipelinePanel from "./PipelinePanel";
@@ -17,15 +17,12 @@ import AuditTimeline from "./AuditTimeline";
 
 const MapView = dynamic(() => import("./MapView"), {
   ssr: false,
-  loading: () => <div className="map-loading">Loading operations map…</div>,
+  loading: () => <div className="map-loading">Loading the map…</div>,
 });
+const FloodIntro = dynamic(() => import("./FloodIntro"), { ssr: false });
 
 export default function Dashboard() {
-  const [starting, setStarting] = useState(true);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setStarting(false), 3000);
-    return () => window.clearTimeout(timer);
-  }, []);
+  const [intro, setIntro] = useState(true);
   const {
     state,
     audit,
@@ -78,61 +75,58 @@ export default function Dashboard() {
     .slice(0, 12);
   return (
     <>
-      {starting && (
-        <div className="startup-loader" role="status" aria-live="polite">
-          <div className="startup-loader-content">
-            <p>GUWAHATI / FLOOD RESPONSE</p>
-            <h2>Loading operations map…</h2>
-            <div className="startup-progress" aria-hidden="true">
-              <span />
+      {intro && <FloodIntro onDone={() => setIntro(false)} />}
+      <div className="ops-dashboard" inert={intro}>
+        <header className="app-bar">
+          <div className="brand">
+            <div className="brand-mark" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path
+                  d="M12 2.5c3.6 4.4 6 7.9 6 11a6 6 0 0 1-12 0c0-3.1 2.4-6.6 6-11Z"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                />
+                <path
+                  d="M8.5 14.5c1.2 1.4 2.4 1.4 3.5 0s2.3-1.4 3.5 0"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
             </div>
+            <h1>Disaster Relief Router</h1>
+            <span className="brand-divider" aria-hidden="true" />
+            <p>Guwahati flood operations</p>
           </div>
-        </div>
-      )}
-      <div className="ops-dashboard" inert={starting}>
-        <header className="ops-header">
-          <div className="header-main">
-            <div className="brand">
-              <div className="brand-mark" aria-hidden="true">
-                ◈
-              </div>
-              <div>
-                <h1>DISASTER RELIEF ROUTER</h1>
-                <p>
-                  GUWAHATI, ASSAM <span> / FLOOD RESPONSE</span>
-                </p>
-              </div>
-            </div>
+          <div className="app-bar-actions">
+            <ScenarioControls
+              system={state?.system ?? null}
+              resetVersion={resetVersion}
+              refresh={refresh}
+              onError={onError}
+            />
             <SystemStatus connected={connected} />
           </div>
-          <div className="header-stats">
-            <StatsChips system={state?.system ?? null} />
-            <span className="section-label">
-              INTAKE → TRIAGE → GOVERNANCE → DISPATCH
-            </span>
-          </div>
-          <ScenarioControls
-            system={state?.system ?? null}
-            resetVersion={resetVersion}
-            refresh={refresh}
-            onError={onError}
-          />
         </header>
+        <KpiStrip state={state} />
         {error && (
-          <div className="connection-error" role="alert">
+          <div className="connection-error" role="alert" title={error}>
             <span>
-              Backend unavailable · {error}{" "}
+              Can’t reach the dispatch server.{" "}
               {state
-                ? "Showing the last good snapshot."
-                : "Check NEXT_PUBLIC_API_URL or enable mock mode."}
+                ? "You’re seeing the last update."
+                : "Start the backend, then try again."}
             </span>
-            <button className="text-link" onClick={() => void refresh()}>
-              Retry
+            <button
+              className="button button-danger"
+              onClick={() => void refresh()}
+            >
+              Try again
             </button>
           </div>
         )}
         <div className="ops-workspace">
-          <aside className="left-panel">
+          <aside className="panel left-panel" aria-label="Incidents">
             <IncidentFeed
               state={state}
               selectedReportId={selectedReportId}
@@ -145,7 +139,7 @@ export default function Dashboard() {
               disabled={!state}
             />
           </aside>
-          <main className="hero-map" aria-label="Operations map">
+          <main className="panel hero-map" aria-label="Operations map">
             <MapView
               state={state}
               selectedReportId={selectedReportId}
@@ -162,7 +156,7 @@ export default function Dashboard() {
               />
             )}
           </main>
-          <aside className="right-panel">
+          <aside className="panel right-panel" aria-label="Decisions">
             <ApprovalQueue
               state={state}
               selectedReportId={selectedReportId}
@@ -172,13 +166,16 @@ export default function Dashboard() {
             />
             <section className="policy-decisions">
               <div className="panel-heading">
-                <h2>Policy decisions</h2>
+                <h2>Blocked by safety rules</h2>
                 <span className="count-badge">{policyEvents.length}</span>
               </div>
               {!state ? (
-                <p className="empty-state">Loading policy audit…</p>
+                <p className="muted panel-pad">Loading…</p>
               ) : policyEvents.length === 0 ? (
-                <p className="muted">No policy refusals recorded.</p>
+                <p className="empty-state">
+                  Nothing blocked yet. Unqualified responders and unsafe routes
+                  appear here.
+                </p>
               ) : (
                 policyEvents.map((entry) => (
                   <button
@@ -193,9 +190,9 @@ export default function Dashboard() {
                       event={entry.event_type}
                       rule={entry.policy_rule}
                     />
-                    <p className="mt-2 text-xs">{entry.message}</p>
-                    <span className="muted font-mono">
-                      {entry.report_id} · {clockTime(entry.created_at)}
+                    <p>{entry.message}</p>
+                    <span>
+                      {entry.report_id} at {clockTime(entry.created_at)}
                     </span>
                   </button>
                 ))
@@ -203,18 +200,23 @@ export default function Dashboard() {
             </section>
           </aside>
         </div>
-        <section className={`audit-drawer ${drawerOpen ? "open" : ""}`}>
+        <section className={`panel audit-drawer ${drawerOpen ? "open" : ""}`}>
           <div className="drawer-heading">
             <button
-              className="section-label"
+              className="drawer-toggle"
               aria-expanded={drawerOpen}
               onClick={() => setDrawerOpen((v) => !v)}
             >
-              {drawerOpen ? "▾" : "▸"} PIPELINE / AUDIT{" "}
-              <span className="text-slate-500">{audit.length} EVENTS</span>
+              <span className="chevron" aria-hidden="true">
+                {drawerOpen ? "▾" : "▸"}
+              </span>
+              Decision trace
+              <small>{audit.length} log entries</small>
             </button>
-            <span className="font-mono muted">
-              {selectedReportId ?? "Select an incident to inspect decisions"}
+            <span className="muted">
+              {selectedReportId
+                ? `Showing ${selectedReportId}`
+                : "Pick an incident to see its steps"}
             </span>
           </div>
           {drawerOpen && (
@@ -236,10 +238,12 @@ export default function Dashboard() {
             <div>
               <p>{toast.message}</p>
               {toast.policyRule && (
-                <span className="badge badge-red mt-2">{toast.policyRule}</span>
+                <span className="badge badge-red mt-2">
+                  Rule {toast.policyRule}
+                </span>
               )}
             </div>
-            <button aria-label="Dismiss error" onClick={() => setToast(null)}>
+            <button aria-label="Dismiss" onClick={() => setToast(null)}>
               ×
             </button>
           </div>
