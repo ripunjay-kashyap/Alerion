@@ -15,6 +15,8 @@ import ReportForm from "./ReportForm";
 import PipelinePanel from "./PipelinePanel";
 import AuditTimeline from "./AuditTimeline";
 import IntelPanel from "./IntelPanel";
+import ServerWake, { SLOW_AFTER_S } from "./ServerWake";
+import { useServerWake } from "@/lib/useServerWake";
 import { SerpApiChip, useFacilities } from "./SerpApiEvidence";
 import type { IntelSuggestion } from "@/lib/types";
 
@@ -35,6 +37,10 @@ export default function Dashboard() {
     routeInvalidation,
     resetVersion,
   } = useOpsState();
+  const wake = useServerWake();
+  useEffect(() => {
+    if (wake.ready) void refresh(); // load the dashboard the moment a sleeping server answers
+  }, [wake.ready, refresh]);
   const [selection, setSelection] = useState<{
     id: string | null;
     reset: number;
@@ -85,6 +91,7 @@ export default function Dashboard() {
   return (
     <>
       {intro && <FloodIntro onDone={() => setIntro(false)} />}
+      <ServerWake ready={wake.ready} elapsed={wake.elapsed} />
       <div className="ops-dashboard" inert={intro}>
         <header className="app-bar">
           <div className="brand">
@@ -111,6 +118,7 @@ export default function Dashboard() {
             <ScenarioControls
               system={state?.system ?? null}
               resetVersion={resetVersion}
+              connecting={!wake.ready}
               refresh={refresh}
               onError={onError}
             />
@@ -119,7 +127,7 @@ export default function Dashboard() {
           </div>
         </header>
         <KpiStrip state={state} />
-        {error && (
+        {error && (wake.ready || wake.elapsed > SLOW_AFTER_S) && (
           <div className="connection-error" role="alert" title={error}>
             <span>
               Can’t reach the dispatch server.{" "}

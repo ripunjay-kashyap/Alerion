@@ -8,11 +8,13 @@ import { useAction } from "@/lib/useAction";
 export default function ScenarioControls({
   system,
   resetVersion,
+  connecting,
   refresh,
   onError,
 }: {
   system: SystemInfo | null;
   resetVersion: number;
+  connecting: boolean; // the server is still waking up: not an error yet
   refresh: () => Promise<void>;
   onError: (error: unknown) => void;
 }) {
@@ -99,7 +101,7 @@ export default function ScenarioControls({
             : `Step ${current.next_event_index} of ${current.total_events}`}
         </span>
       )}
-      {error && (
+      {error && !connecting && (
         <span className="scenario-error" title={error}>
           Demo unavailable
         </span>

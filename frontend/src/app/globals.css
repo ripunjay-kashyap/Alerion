@@ -1411,6 +1411,59 @@ textarea::placeholder {
   color: var(--ink-faint);
 }
 
+/* ---------- server wake-up (free-tier cold start) ---------- */
+.server-wake {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  z-index: 110; /* above the intro, which plays while the server wakes */
+  transform: translateX(-50%);
+  width: min(420px, calc(100% - 32px));
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+  transition: opacity 400ms ease;
+}
+.server-wake.ready {
+  opacity: 0;
+  transition-delay: 500ms;
+}
+.server-wake-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--ink);
+}
+.server-wake-head span {
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+}
+.server-wake-bar {
+  height: 6px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--accent-soft);
+}
+.server-wake-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 400ms ease;
+}
+.server-wake.ready .server-wake-bar span {
+  background: var(--go);
+}
+.server-wake p {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
 /* ---------- intro (three.js flood scene) ---------- */
 .flood-intro {
   position: fixed;
