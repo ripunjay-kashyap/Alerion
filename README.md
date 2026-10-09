@@ -7,8 +7,6 @@ Guwahati (Assam) flood scenario · FastAPI backend · Next.js frontend · Supaba
 - **Live dashboard:** https://alerion-two.vercel.app
 - **API:** https://alerion-backend.onrender.com ([docs](https://alerion-backend.onrender.com/docs))
 
-> Free-tier backend: open `/api/health` once to wake it before use.
-
 ---
 
 ## The problem
@@ -26,7 +24,7 @@ different capabilities, and roads close in real time.
 4. **Finds qualified responders** through an explainable funnel (availability → skill → medical certification → vehicle → safe route → ETA).
 5. **Generates safe routes** on real roads that avoid active flood zones and blocked roads.
 6. **Requires human approval** for sensitive dispatches. Approvals re-validate the route at approval time.
-7. **Reroutes live** when a new hazard cuts an active route (hero demo: ETA 9.7 → 13.3 min, old route shown dashed).
+7. **Reroutes live** when a new hazard cuts an active route (in the demo: ETA 9.7 → 13.3 min, with the old route shown dashed).
 8. **Audits everything.** Every extraction, score, policy decision, refusal, approval, dispatch and reroute, with the acting pipeline stage, system component or human.
 9. **Merges duplicates.** Near-duplicate reports fold into the existing incident and raise its trust instead of starting a second pipeline run or dispatch.
 10. **Checks the outside world with SerpApi.** Google Maps finds the landmarks people actually name, Google News corroborates a report
