@@ -1,10 +1,11 @@
-# Disaster Relief Router
+# Alerion: Disaster Relief Router
 
 **A governed disaster dispatch system: messy flood reports in, safe, auditable volunteer assignments and live Mapbox routes out.**
 
 Guwahati (Assam) flood scenario · FastAPI backend · Next.js frontend · Supabase · Mapbox · SerpApi
 
 - **Live dashboard:** https://alerion-two.vercel.app
+- **Demo video (2:50):** https://drive.google.com/file/d/14og1osGKm9_2hgBMkGQIl9WGOcJebU2y/view?usp=sharing
 - **API:** https://alerion-backend.onrender.com ([docs](https://alerion-backend.onrender.com/docs))
 
 ---
