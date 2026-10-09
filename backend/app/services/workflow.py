@@ -322,8 +322,7 @@ async def _news_evidence(
     session: AsyncSession, report: Report, loc: geo.ResolvedLocation | None, location_text: str | None
 ) -> dict[str, Any] | None:
     """SerpApi Google News check for reports that are not already verified by their source."""
-    cfg = policy.config()["trust"]
-    if not loc or cfg["base"].get(report.source_type, 0) >= cfg["verified_threshold"]:
+    if not loc or not intel.needs_news(report.source_type):
         return None
     news = await intel.news_corroboration(intel.locality_for(loc, location_text))
     if not news["available"]:

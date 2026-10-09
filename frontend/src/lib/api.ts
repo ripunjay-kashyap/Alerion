@@ -61,6 +61,8 @@ const post = <T>(path: string, body?: unknown) =>
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
 const mock = () => import("./mock").then((m) => m.mockApi);
+const noSerpApi = <T>() =>
+  Promise.reject<T>(new ApiError("SerpApi isn’t available with sample data.", 503));
 const idPath = (id: string) => encodeURIComponent(id);
 
 export const api = {
@@ -111,15 +113,17 @@ export const api = {
       ? Promise.resolve<IntelStatus | null>(null)
       : request<IntelStatus>("/api/intel/status"),
   intelScan: () =>
-    USE_MOCK
-      ? Promise.reject(new ApiError("SerpApi isn’t available with sample data.", 503))
-      : post<IntelScan>("/api/intel/scan"),
+    USE_MOCK ? noSerpApi<IntelScan>() : post<IntelScan>("/api/intel/scan"),
   acceptSuggestion: (id: string) =>
-    post<{ suggestion: IntelSuggestion; hazard: Hazard; rerouted_assignments: string[] }>(
-      `/api/intel/suggestions/${idPath(id)}/accept`,
-    ),
+    USE_MOCK
+      ? noSerpApi<{ suggestion: IntelSuggestion; hazard: Hazard; rerouted_assignments: string[] }>()
+      : post<{ suggestion: IntelSuggestion; hazard: Hazard; rerouted_assignments: string[] }>(
+          `/api/intel/suggestions/${idPath(id)}/accept`,
+        ),
   dismissSuggestion: (id: string) =>
-    post<IntelSuggestion>(`/api/intel/suggestions/${idPath(id)}/dismiss`),
+    USE_MOCK
+      ? noSerpApi<IntelSuggestion>()
+      : post<IntelSuggestion>(`/api/intel/suggestions/${idPath(id)}/dismiss`),
   facilities: (reportId: string) =>
     USE_MOCK
       ? Promise.resolve<Facilities | null>(null)

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import type { Facilities, IntelStatus, NewsArticle, OpsState, Report } from "@/lib/types";
 
-export const timeAgo = (iso: string | null) => {
+const timeAgo = (iso: string | null) => {
   if (!iso) return "past 24 h";
   const minutes = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 60000));
   if (minutes < 60) return `${minutes} min ago`;
@@ -172,7 +172,11 @@ export function SerpApiChip({ state }: { state: OpsState | null }) {
       <span className="serp-chip-dot" aria-hidden="true" />
       Powered by <b>SerpApi</b>
       <small>
-        {status.key_configured ? `${mode} · ${used} lookups` : "no key: evidence off"}
+        {status.key_configured
+          ? `${mode} · ${used} lookups`
+          : ready
+            ? "no key: cached results only"
+            : "no key: evidence off"}
       </small>
     </span>
   );

@@ -17,7 +17,14 @@ LIFE_SAFETY_VULNERABILITIES = {"elderly", "child", "pregnant", "disabled", "medi
 
 @lru_cache
 def config() -> dict[str, Any]:
-    return yaml.safe_load(get_settings().policy_path.read_text())
+    cfg = yaml.safe_load(get_settings().policy_path.read_text())
+    # news alone must never verify a report, or unlock a life-safety auto-dispatch (GOV-02)
+    cap = cfg["trust"]["news_max_score"]
+    if cap >= min(cfg["trust"]["verified_threshold"], cfg["dispatch"]["life_safety_min_trust_for_auto"]):
+        raise ValueError(
+            "policy.yaml: trust.news_max_score must stay below the verified / auto-dispatch thresholds"
+        )
+    return cfg
 
 
 def rule(rule_id: str) -> dict[str, Any]:

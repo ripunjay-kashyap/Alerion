@@ -36,12 +36,6 @@ class SourceType(StrEnum):
     ANONYMOUS = "anonymous"
 
 
-class NeedType(StrEnum):
-    RESCUE = "rescue"
-    MEDICAL = "medical"
-    FOOD = "food"
-
-
 class ReportStatus(StrEnum):
     RECEIVED = "RECEIVED"
     STRUCTURED = "STRUCTURED"
@@ -93,6 +87,12 @@ class ApprovalAction(StrEnum):
     DISPATCH = "dispatch"  # life-safety dispatch from unverified source
     REVIEW = "review"  # low-confidence / missing location
     ESCALATION = "escalation"  # no safe route / no eligible volunteer
+
+
+class IntelStatus(StrEnum):
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    DISMISSED = "dismissed"
 
 
 class HazardKind(StrEnum):
@@ -256,7 +256,7 @@ class IntelSuggestion(TimestampMixin, Base):
     radius_m: Mapped[float] = mapped_column(Float)
     location_source: Mapped[str] = mapped_column(String(32))
     evidence: Mapped[list[dict[str, Any]]] = mapped_column(JsonType, default=list)  # articles that named it
-    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | accepted | dismissed
+    status: Mapped[str] = mapped_column(String(16), default=IntelStatus.PENDING)
     hazard_id: Mapped[str | None] = mapped_column(String(16))
 
 

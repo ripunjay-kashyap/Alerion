@@ -13,7 +13,7 @@ import json
 import logging
 import math
 import re
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from functools import lru_cache
 from typing import Any
 
@@ -23,7 +23,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
-from app.models import Hazard, HazardKind, IntelSuggestion, Report, utcnow
+from app.models import Hazard, HazardKind, IntelStatus, IntelSuggestion, Report, utcnow
 from app.services import audit, geo, policy, serpapi
 from app.services.audit import Actor
 
@@ -37,10 +37,6 @@ NOT_CONDITIONS = re.compile(
 )
 SCAN_NEWS_QUERY = "Guwahati flood OR waterlogging OR waterlogged when:1d"
 SCAN_WEB_QUERY = "Guwahati waterlogging flood today"
-
-
-def _now() -> datetime:
-    return utcnow()  # patched in tests so cached articles stay "recent"
 
 
 def _cfg() -> dict[str, Any]:
@@ -57,13 +53,22 @@ def _mentions(text: str, name: str) -> bool:
 
 
 def _recent(article: dict[str, Any]) -> bool:
-    if article.get("engine") == "google":  # bounded by tbs=qdr:d at query time
-        return True
+    window = timedelta(hours=_cfg()["news_window_hours"])
+    if article.get("engine") == "google":
+        # tbs=qdr:d bounds web results to the 24 h before the search ran; a replayed copy ages from there
+        stamp = article.get("fetched_at")
+        return stamp is None or utcnow() - datetime.fromtimestamp(stamp, UTC) <= window
     try:
         published = datetime.fromisoformat(article["iso_date"].replace("Z", "+00:00"))
     except (KeyError, TypeError, ValueError):
         return False
-    return _now() - published <= timedelta(hours=_cfg()["news_window_hours"])
+    return utcnow() - published <= window
+
+
+def needs_news(source_type: str) -> bool:
+    """Only reports whose source isn't already trusted enough to count as verified get a news check."""
+    cfg = policy.config()["trust"]
+    return cfg["base"].get(source_type, 0) < cfg["verified_threshold"]
 
 
 def locality_for(loc: geo.ResolvedLocation, location_text: str | None) -> str:
@@ -83,8 +88,7 @@ async def prefetch(location_text: str | None, raw_text: str, source_type: str) -
     """Warm the SerpApi memo before the intake step takes the global lock (same calls, same order)."""
     try:
         loc = await geo.resolve(location_text, raw_text)
-        cfg = policy.config()["trust"]
-        if loc and cfg["base"].get(source_type, 0) < cfg["verified_threshold"]:
+        if loc and needs_news(source_type):
             await news_corroboration(locality_for(loc, location_text))
     except Exception:  # best effort only; the intake step does the real work
         log.exception("serpapi prefetch failed")
@@ -126,7 +130,12 @@ async def facilities(report: Report) -> dict[str, Any]:
         return {"query": None, "available": False, "reason": "report has no location", "results": []}
     query = _cfg()["facility_queries"].get(report.need_type or "")
     if not query:
-        return {"query": None, "available": False, "reason": "no nearby-help search for this need", "results": []}
+        return {
+            "query": None,
+            "available": False,
+            "reason": "no nearby-help search for this need",
+            "results": [],
+        }
     try:
         places = await serpapi.maps_search(query, ll=f"@{report.latitude:.4f},{report.longitude:.4f},15z")
     except serpapi.SerpApiUnavailable as e:
@@ -153,7 +162,7 @@ async def _gather_articles() -> tuple[list[dict[str, Any]], list[dict[str, Any]]
         ("google", serpapi.web_search_recent, SCAN_WEB_QUERY),
     ):
         try:
-            found = await fn(q)
+            found = await fn(q, fresh=True)  # a dispatcher asked: wait for today's results
             searches.append({"engine": engine, "query": q, "results": len(found)})
             articles += found
         except serpapi.SerpApiUnavailable as e:
@@ -197,14 +206,12 @@ async def gather() -> dict[str, Any]:
 
 
 async def scan(session: AsyncSession, found: dict[str, Any]) -> dict[str, Any]:
-    """DB half of a scan: new suggestions per locality, new articles appended to open ones."""
+    """DB half of a scan: new suggestions per locality, new articles appended to open ones.
+    A dismissed locality is only proposed again when articles the dispatcher hasn't seen name it."""
     articles, searches, groups = found["articles"], found["searches"], found["groups"]
-    existing = {
-        s.locality: s
-        for s in (
-            await session.scalars(select(IntelSuggestion).where(IntelSuggestion.status != "dismissed"))
-        ).all()
-    }
+    rows = (await session.scalars(select(IntelSuggestion).order_by(IntelSuggestion.created_at))).all()
+    existing = {s.locality: s for s in rows if s.status != IntelStatus.DISMISSED}
+    seen = {s.locality: {e["link"] for e in s.evidence} for s in rows if s.status == IntelStatus.DISMISSED}
     created, refreshed = [], []
     for name, evidence in sorted(groups.items(), key=lambda kv: -len(kv[1])):
         if prev := existing.get(name):
@@ -215,6 +222,8 @@ async def scan(session: AsyncSession, found: dict[str, Any]) -> dict[str, Any]:
                 refreshed.append(prev.id)
             continue
         if not (loc := found["places"].get(name)):
+            continue
+        if name in seen and all(e["link"] in seen[name] for e in evidence):
             continue
         sug = IntelSuggestion(
             locality=name,
@@ -264,7 +273,7 @@ async def _pending(session: AsyncSession, suggestion_id: str) -> IntelSuggestion
     sug = await session.get(IntelSuggestion, suggestion_id)
     if not sug:
         raise WorkflowError("not_found", f"Suggestion {suggestion_id} not found", 404)
-    if sug.status != "pending":
+    if sug.status != IntelStatus.PENDING:
         raise WorkflowError("invalid_transition", f"Suggestion {suggestion_id} is already {sug.status}")
     return sug
 
@@ -287,7 +296,7 @@ async def accept(
     )
     session.add(h)
     await session.flush()
-    sug.status, sug.hazard_id = "accepted", h.id
+    sug.status, sug.hazard_id = IntelStatus.ACCEPTED, h.id
     audit.record(
         session,
         actor=actor,
@@ -308,7 +317,7 @@ async def accept(
 
 async def dismiss(session: AsyncSession, suggestion_id: str, actor: Actor) -> IntelSuggestion:
     sug = await _pending(session, suggestion_id)
-    sug.status = "dismissed"
+    sug.status = IntelStatus.DISMISSED
     audit.record(
         session,
         actor=actor,

@@ -348,14 +348,12 @@ textarea::placeholder {
 .button:hover:not(:disabled) {
   background: var(--hover);
 }
-.button-primary,
-.button-emerald {
+.button-primary {
   background: var(--accent);
   border-color: var(--accent);
   color: #ffffff;
 }
-.button-primary:hover:not(:disabled),
-.button-emerald:hover:not(:disabled) {
+.button-primary:hover:not(:disabled) {
   background: var(--accent-hover);
   border-color: var(--accent-hover);
 }

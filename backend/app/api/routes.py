@@ -1,4 +1,4 @@
-"""Product API consumed by the operator dashboard. Contract: docs/api-contract.md."""
+"""Product API consumed by the operator dashboard. Interactive reference: /docs (OpenAPI)."""
 
 import asyncio
 
@@ -9,7 +9,7 @@ from sse_starlette.sse import EventSourceResponse
 
 from app import simulator
 from app.config import get_settings
-from app.db import get_session
+from app.db import SessionLocal, get_session
 from app.events import bus
 from app.models import (
     Approval,
@@ -17,6 +17,7 @@ from app.models import (
     AuditEntry,
     Hazard,
     HazardKind,
+    IntelStatus,
     IntelSuggestion,
     Report,
     SystemState,
@@ -45,7 +46,7 @@ from app.schemas import (
     SystemStats,
     VolunteerOut,
 )
-from app.services import audit, intel, reroute, serpapi, workflow
+from app.services import audit, geo, intel, reroute, serpapi, workflow
 from app.services.seed import reset_operational_state
 from app.services.uow import unit_of_work
 from app.services.workflow import WorkflowError
@@ -121,6 +122,9 @@ async def list_approvals(session: AsyncSession = Depends(get_session)):
 @router.post("/approvals/{approval_id}/approve", response_model=ApprovalOut)
 async def approve(approval_id: str, body: ApprovalResolveIn | None = None):
     body = body or ApprovalResolveIn()
+    fix = body.corrections
+    if fix and fix.location_text and fix.latitude is None:
+        await geo.resolve(fix.location_text)  # warm the SerpApi / Mapbox caches before taking the lock
     async with unit_of_work() as s:
         appr, follow_up = await workflow.resolve_approval(
             s, approval_id, approve=True, note=body.note, corrections=body.corrections, actor=audit.DISPATCHER
@@ -141,9 +145,10 @@ async def reject(approval_id: str, body: ApprovalRejectIn | None = None):
 
 
 @router.get("/reports/{report_id}/facilities", response_model=FacilitiesOut)
-async def report_facilities(report_id: str, session: AsyncSession = Depends(get_session)):
+async def report_facilities(report_id: str):
     """Google Maps (SerpApi): hospitals near rescue and medical incidents. Open ones first."""
-    report = await workflow.get_report(session, report_id)
+    async with SessionLocal() as s:  # released before the (up to 15 s) SerpApi call
+        report = await workflow.get_report(s, report_id)
     return FacilitiesOut(report_id=report.id, **await intel.facilities(report))
 
 
@@ -173,7 +178,7 @@ async def intel_scan():
     async with unit_of_work() as s:
         summary = await intel.scan(s, found)
     async with unit_of_work() as s:
-        q = select(IntelSuggestion).where(IntelSuggestion.status == "pending")
+        q = select(IntelSuggestion).where(IntelSuggestion.status == IntelStatus.PENDING)
         pending = (await s.scalars(q.order_by(IntelSuggestion.created_at.desc()))).all()
     return IntelScanOut(**summary, suggestions=pending)
 

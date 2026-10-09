@@ -1,10 +1,13 @@
 """SerpApi evidence layer, offline. `serpapi.search` is replaced with canned Google Maps / News / Search
-responses, so everything above it (location fallback, news corroboration, trust cap, scan → accept → reroute)
-runs for real."""
+responses, so everything above it (location fallback, news corroboration, trust cap, scan → accept / dismiss)
+runs for real. The client tests at the bottom use an httpx mock transport, never the network."""
 
 import asyncio
+import json
+import time
 from datetime import UTC, datetime, timedelta
 
+import httpx
 import pytest
 
 from app.models import Report
@@ -122,7 +125,7 @@ def fake_responses(engine: str, params: dict) -> dict:
 def serp(monkeypatch):
     calls = []
 
-    async def fake(engine, params):
+    async def fake(engine, params, **_):
         calls.append((engine, params.get("q")))
         return fake_responses(engine, params)
 
@@ -173,7 +176,7 @@ async def test_google_maps_resolves_landmarks_mapbox_cannot(serp):
 
 
 async def test_serpapi_unavailable_is_neutral(monkeypatch):
-    async def down(engine, params):
+    async def down(engine, params, **_):
         raise serpapi.SerpApiUnavailable("offline")
 
     monkeypatch.setattr(serpapi, "search", down)
@@ -260,6 +263,31 @@ async def test_scan_suggests_zones_and_accept_activates_hazard(client, serp):
     assert (await client.get("/api/intel/suggestions")).json() == []
 
 
+async def test_dismissed_zone_stays_dismissed_until_new_sources(client, serp, monkeypatch):
+    body = (await client.post("/api/intel/scan")).json()
+    anil = next(x for x in body["suggestions"] if x["locality"] == "Anil Nagar")
+    assert (await client.post(f"/api/intel/suggestions/{anil['id']}/dismiss")).json()["status"] == "dismissed"
+    assert (await client.post(f"/api/intel/suggestions/{anil['id']}/accept")).status_code == 409
+
+    again = (await client.post("/api/intel/scan")).json()  # same articles → not proposed again
+    assert again["created"] == [] and all(x["locality"] != "Anil Nagar" for x in again["suggestions"])
+
+    def with_new_article(engine, params):
+        data = fake_responses(engine, params)
+        if engine == "google_news" and params.get("q") == intel.SCAN_NEWS_QUERY:
+            data["news_results"].append(
+                {"title": "Anil Nagar flooded again", "link": "https://news.example/new", "iso_date": _ago(1)}
+            )
+        return data
+
+    async def fake(engine, params, **_):
+        return with_new_article(engine, params)
+
+    monkeypatch.setattr(serpapi, "search", fake)
+    fresh = (await client.post("/api/intel/scan")).json()
+    assert len(fresh["created"]) == 1 and fresh["suggestions"][0]["locality"] == "Anil Nagar"
+
+
 async def test_status_reports_mode_without_key(client):
     st = (await client.get("/api/intel/status")).json()
     assert st["provider"] == "SerpApi" and st["key_configured"] is False and st["account"] is None
@@ -277,3 +305,105 @@ async def test_cache_layer_serves_disk_cache_offline(monkeypatch, tmp_path):
     before = serpapi.usage.cached
     assert (await serpapi.news_search("Anil Nagar flood"))[0]["link"] == "l"
     assert serpapi.usage.cached == before + 1
+
+
+# ---------------------------------------------------------------- client: errors, freshness, failures
+
+
+@pytest.fixture
+def live_client(monkeypatch, tmp_path):
+    """serpapi._fetch against an httpx mock transport, in cache_first mode with a (fake) key."""
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "seed_dir", tmp_path)
+    monkeypatch.setattr(settings, "serpapi_mode", "cache_first")
+    monkeypatch.setattr(settings, "serpapi_key", "SECRET-KEY-123")
+    monkeypatch.setattr(serpapi, "_memo", {})
+    calls: list[httpx.Request] = []
+    responses: list[httpx.Response] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request)
+        return responses.pop(0)
+
+    monkeypatch.setattr(serpapi, "_client", httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+    return calls, responses
+
+
+async def test_errors_never_carry_the_api_key(live_client, caplog):
+    calls, responses = live_client
+    responses.append(httpx.Response(401, json={"error": "Invalid API key."}))
+    with pytest.raises(serpapi.SerpApiUnavailable) as e:
+        await serpapi.news_search("Anil Nagar flood")
+    assert str(e.value) == "HTTP 401: Invalid API key."
+    assert "SECRET-KEY-123" in str(calls[0].url)  # it was sent...
+    assert "SECRET-KEY-123" not in caplog.text  # ...but never logged
+    assert e.value.__cause__ is None and e.value.__suppress_context__  # nor chained into a traceback
+
+    # the failure is remembered: the locked pipeline step doesn't hit the network again
+    with pytest.raises(serpapi.SerpApiUnavailable):
+        await serpapi.news_search("Anil Nagar flood")
+    assert len(calls) == 1
+
+    # facilities and news report the safe message to the API
+    report = Report(
+        raw_text="x", source_type="citizen", need_type="medical", latitude=26.1745, longitude=91.786
+    )
+    responses.append(httpx.Response(429, json={"error": "Your account has run out of searches."}))
+    out = await intel.facilities(report)
+    assert (
+        out["available"] is False and "SECRET" not in out["reason"] and out["reason"].startswith("HTTP 429")
+    )
+
+
+async def test_stale_news_is_refetched_and_failures_fall_back_to_it(live_client):
+    calls, responses = live_client
+    params = {"q": "Anil Nagar flood", "gl": "in", "hl": "en"}
+    path = serpapi._cache_path("google_news", params)
+    stale = {"news_results": [{"title": "old", "link": "old"}], "_fetched_at": time.time() - 2 * 3600}
+    path.write_text(json.dumps(stale))
+
+    # the pipeline gets the stale copy at once and the refresh runs in the background...
+    responses.append(httpx.Response(200, json={"news_results": [{"title": "new", "link": "new"}]}))
+    assert [a["link"] for a in await serpapi.news_search("Anil Nagar flood")] == ["old"]
+    await asyncio.gather(*serpapi._refreshing.values())
+    assert json.loads(path.read_text())["_fetched_at"] > time.time() - 60
+    assert [a["link"] for a in await serpapi.news_search("Anil Nagar flood")] == ["new"]  # memo updated
+
+    # ...while a dispatcher's scan waits for fresh results
+    path.write_text(json.dumps(stale))
+    serpapi._memo.clear()
+    responses.append(httpx.Response(200, json={"news_results": [{"title": "newer", "link": "newer"}]}))
+    assert [a["link"] for a in await serpapi.news_search("Anil Nagar flood", fresh=True)] == ["newer"]
+
+    # maps results don't go stale; time-bounded ones do, and a failed refresh serves the stale copy
+    serpapi._memo.clear()
+    path.write_text(json.dumps(stale))
+    responses.append(httpx.Response(500, text="boom"))
+    assert [a["link"] for a in await serpapi.news_search("Anil Nagar flood", fresh=True)] == ["old"]
+    assert len(calls) == 3
+
+
+def test_stale_web_results_are_not_recent():
+    hour = 3600
+    assert intel._recent({"engine": "google", "fetched_at": time.time() - hour})
+    assert not intel._recent({"engine": "google", "fetched_at": time.time() - 30 * hour})
+
+
+def test_policy_refuses_a_news_cap_that_could_verify(monkeypatch, tmp_path):
+    import yaml
+
+    from app.config import get_settings
+
+    cfg = yaml.safe_load(get_settings().policy_path.read_text())
+    cfg["trust"]["news_max_score"] = 0.8
+    bad = tmp_path / "policy.yaml"
+    bad.write_text(yaml.safe_dump(cfg))
+    monkeypatch.setattr(get_settings(), "policy_path", bad)
+    policy.config.cache_clear()
+    try:
+        with pytest.raises(ValueError, match="news_max_score"):
+            policy.config()
+    finally:
+        policy.config.cache_clear()

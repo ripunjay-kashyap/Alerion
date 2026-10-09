@@ -33,3 +33,7 @@ next-env.d.ts
 .idea/
 .vscode/
 submission_answers.txt
+.playwright-mcp/
+.agents/
+.codex/
+.aws/

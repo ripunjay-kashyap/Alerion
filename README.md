@@ -77,8 +77,11 @@ engine still makes every decision.**
 
 Calls go through `app/services/serpapi.py` with the same modes as Mapbox (`SERPAPI_MODE=live | cache_first | cache_only`) and
 an on-disk cache in `backend/seed/serp_cache/`. Demo replays are repeatable and free (SerpApi doesn't count cached searches
-either), and tests never touch the network. Lookups the pipeline needs are prefetched outside the transaction lock, so a slow
-search never stalls other reports. Without a key, or offline, the layer is skipped and the pipeline behaves exactly as before.
+either), and tests never touch the network. Time-bounded news and web searches are refetched once their cached copy is an hour
+old, so "past 24 h" stays true. SerpApi lookups the pipeline needs are prefetched outside the transaction lock (failures are
+remembered briefly too), so a slow search never stalls other reports. Error messages never include the request URL, so the API
+key can't leak into responses, the audit trail or logs. Without a key the cached results still replay; offline, the layer is
+skipped and the pipeline behaves exactly as before.
 
 ## Repository layout
 
@@ -86,9 +89,11 @@ search never stalls other reports. Without a key, or offline, the layer is skipp
 backend/              FastAPI service
   app/api/            product API (/api/*) and the SSE stream
   app/orchestrator/   report pipeline (intake → triage → dispatch)
-  app/services/       workflow steps, policy, routing, safety, reroute, audit, seeding
-  policy.yaml         governance rules and scoring weights
-  seed/               volunteers, hazards, known places, intake fixtures, cached Mapbox responses
+  app/services/       workflow steps, policy, routing, safety, reroute, audit, seeding;
+                      geo.py (location resolution), serpapi.py (SerpApi client + cache), intel.py (news, facilities, scan)
+  policy.yaml         governance rules, scoring weights and SerpApi intel settings
+  seed/               volunteers, hazards, known places, Guwahati localities, intake fixtures,
+                      cached Mapbox and SerpApi responses (mapbox_cache/, serp_cache/)
   tests/              offline end-to-end scenario tests
 frontend/             Next.js + Mapbox operations dashboard (opt-in mock mode for UI work)
 scenarios/            replayable demo scenarios
@@ -146,10 +151,10 @@ npm ci && npm run dev
 ## Deploy
 
 - **Backend → Render** via `render.yaml`. Set `DATABASE_URL` (Supabase session pooler URI), `MAPBOX_TOKEN`, `SERPAPI_KEY` and
-  `CORS_ORIGINS` in the Render dashboard (`render.yaml` sets `MAPBOX_MODE=cache_first`). Runs as one instance with
+  `CORS_ORIGINS` in the Render dashboard (`render.yaml` sets `MAPBOX_MODE` and `SERPAPI_MODE` to `cache_first`). Runs as one instance with
   one worker, because the SSE event bus and the pipeline tasks are in-process.
 - **Frontend → Vercel** from `frontend/`. `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_MAPBOX_TOKEN` (a URL-restricted public
-  token) are read at build time from `frontend/.env.production`.
+  token) are read at build time from `frontend/.env.production` (git-ignored; same variables as `frontend/.env.example`).
 
 ## Scope & claims
 

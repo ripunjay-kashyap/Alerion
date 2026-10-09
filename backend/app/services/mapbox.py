@@ -10,6 +10,7 @@ import hashlib
 import json
 import logging
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -45,7 +46,7 @@ def _http() -> httpx.AsyncClient:
     return _client
 
 
-def _cache_path(kind: str, key_obj: dict) -> Any:
+def _cache_path(kind: str, key_obj: dict) -> Path:
     digest = hashlib.sha1(json.dumps(key_obj, sort_keys=True).encode()).hexdigest()[:20]
     d = get_settings().seed_dir / "mapbox_cache"
     d.mkdir(parents=True, exist_ok=True)
@@ -66,10 +67,14 @@ async def _get_json(kind: str, url: str, params: dict[str, Any]) -> dict:
         r.raise_for_status()
         data = r.json()
     except (httpx.HTTPError, ValueError) as e:
+        # never str() an httpx error: its message contains the request URL, access_token included
+        reason = (
+            f"HTTP {e.response.status_code}" if isinstance(e, httpx.HTTPStatusError) else type(e).__name__
+        )
         if path.exists():  # stale cache beats no answer
-            log.warning("mapbox %s failed (%s); serving cached response", kind, e)
+            log.warning("mapbox %s failed (%s); serving cached response", kind, reason)
             return json.loads(path.read_text())
-        raise MapboxUnavailable(str(e)) from e
+        raise MapboxUnavailable(reason) from None
     path.write_text(json.dumps(data))
     return data
 
