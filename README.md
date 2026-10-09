@@ -161,5 +161,4 @@ Reusable beyond floods: earthquakes, wildfires, storms, humanitarian logistics, 
 
 ## AI tools used
 
-**Claude Code** and **Codex** were used as coding co-pilots for the implementation. The idea, design decisions, testing and demo are
-the team's own.
+**Claude Code** and **Codex** were used as coding co-pilots for the implementation.
