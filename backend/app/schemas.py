@@ -134,6 +134,54 @@ class SystemOut(ORM):
     stats: SystemStats = SystemStats()
 
 
+class IntelSuggestionOut(ORM):
+    id: str
+    locality: str
+    label: str
+    longitude: float
+    latitude: float
+    radius_m: float
+    location_source: str
+    evidence: list[dict[str, Any]]
+    status: str
+    hazard_id: str | None
+    created_at: datetime
+
+
+class IntelScanOut(BaseModel):
+    searches: list[dict[str, Any]]
+    articles: int
+    localities: list[str]
+    created: list[str]
+    refreshed: list[str]
+    unresolved: list[str]
+    suggestions: list[IntelSuggestionOut]
+
+
+class IntelAcceptOut(BaseModel):
+    suggestion: IntelSuggestionOut
+    hazard: HazardOut
+    rerouted_assignments: list[str]
+
+
+class IntelStatusOut(BaseModel):
+    provider: str = "SerpApi"
+    mode: str
+    key_configured: bool
+    engines: list[str]
+    session_usage: dict[str, Any]
+    account: dict[str, Any] | None
+
+
+class FacilitiesOut(BaseModel):
+    report_id: str
+    engine: str | None = None
+    query: str | None
+    available: bool
+    reason: str | None = None
+    results: list[dict[str, Any]]
+
+
 class StateOut(BaseModel):
     system: SystemOut
     reports: list[ReportOut]
@@ -141,6 +189,7 @@ class StateOut(BaseModel):
     hazards: list[HazardOut]
     assignments: list[AssignmentOut]
     approvals: list[ApprovalOut]
+    intel_suggestions: list[IntelSuggestionOut] = []
 
 
 # ---------- inputs ----------

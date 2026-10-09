@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     mapbox_token: str = ""
     mapbox_mode: Literal["live", "cache_first", "cache_only"] = "cache_first"
 
+    # SerpApi (Google Maps / Google News / Google Search evidence). Same modes as Mapbox.
+    serpapi_key: str = ""
+    serpapi_mode: Literal["live", "cache_first", "cache_only"] = "cache_first"
+
     # HTTP
     cors_origins: str = "http://localhost:3000"
 

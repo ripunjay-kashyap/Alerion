@@ -30,7 +30,7 @@ from app.models import (
     utcnow,
 )
 from app.schemas import IntakeData, ReviewCorrections, TriageData
-from app.services import audit, geo, policy, routing
+from app.services import audit, geo, intel, policy, routing
 from app.services.audit import Actor
 from app.services.intake import quick_need
 
@@ -196,12 +196,15 @@ async def _merge_duplicate(
             corroborations=parent.duplicate_count,
             in_incident_zone=bool((parent.trust_breakdown or {}).get("_incident_zone")),
             location_confidence=parent.location_confidence,
+            news_articles=len(((parent.trust_breakdown or {}).get("_news") or {}).get("articles") or []),
         )
         old = parent.trust_score
         parent.trust_score, parent.verification_status = t.score, t.verification_status
         parent.trust_breakdown = {
             **t.breakdown,
             "_incident_zone": (parent.trust_breakdown or {}).get("_incident_zone"),
+            "_news": (parent.trust_breakdown or {}).get("_news"),
+            "_location": (parent.trust_breakdown or {}).get("_location"),
         }
         trust_note = f" Trust {old:.2f} → {t.score:.2f} (corroboration)."
     else:
@@ -259,21 +262,30 @@ async def submit_intake(
             report,
             actor,
             "LOCATION_RESOLVED",
-            f"Location resolved to {loc.name} via {loc.source} (confidence {loc.confidence:.2f})",
-            output_snapshot={"lng": loc.lng, "lat": loc.lat, "source": loc.source},
+            f"Location resolved to {loc.name} via "
+            f"{'Google Maps (SerpApi)' if loc.source == 'google_maps' else loc.source}"
+            f" (confidence {loc.confidence:.2f})",
+            output_snapshot={"lng": loc.lng, "lat": loc.lat, "source": loc.source, "place": loc.evidence},
         )
     else:
         report.latitude = report.longitude = None
         report.location_confidence = None
 
+    news = await _news_evidence(session, report, loc, data.location_text)
     t = policy.compute_trust(
         report.source_type,
         corroborations=report.duplicate_count or 0,
         in_incident_zone=bool(loc and loc.incident_zone),
         location_confidence=report.location_confidence,
+        news_articles=len(news["articles"]) if news else 0,
     )
     report.trust_score, report.verification_status = t.score, t.verification_status
-    report.trust_breakdown = {**t.breakdown, "_incident_zone": bool(loc and loc.incident_zone)}
+    report.trust_breakdown = {
+        **t.breakdown,
+        "_incident_zone": bool(loc and loc.incident_zone),
+        "_news": news,
+        "_location": {"source": loc.source, "place": loc.evidence} if loc else None,
+    }
     _report_audit(
         session,
         report,
@@ -304,6 +316,35 @@ async def submit_intake(
         "trust_score": t.score,
         "verification_status": t.verification_status,
     }
+
+
+async def _news_evidence(
+    session: AsyncSession, report: Report, loc: geo.ResolvedLocation | None, location_text: str | None
+) -> dict[str, Any] | None:
+    """SerpApi Google News check for reports that are not already verified by their source."""
+    cfg = policy.config()["trust"]
+    if not loc or cfg["base"].get(report.source_type, 0) >= cfg["verified_threshold"]:
+        return None
+    news = await intel.news_corroboration(intel.locality_for(loc, location_text))
+    if not news["available"]:
+        return None  # no key / offline: skip silently, absence of evidence is neutral
+    n = len(news["articles"])
+    audit.record(
+        session,
+        actor=intel.INTEL,
+        event_type="NEWS_CORROBORATION",
+        message=(
+            f"Google News via SerpApi: {n} recent article(s) report flooding at this locality"
+            if n
+            else "Google News via SerpApi: no recent coverage of this locality (neutral)"
+        ),
+        entity_type="report",
+        entity_id=report.id,
+        report_id=report.id,
+        input_snapshot={"query": news["query"]},
+        output_snapshot={"articles": news["articles"]},
+    )
+    return news
 
 
 async def _needs_review(session: AsyncSession, report: Report, decision: policy.PolicyDecision) -> None:

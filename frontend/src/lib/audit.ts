@@ -15,7 +15,12 @@ const eventsByStage: Record<Stage, AuditEventType[]> = {
     "INTAKE_STRUCTURED",
     "LOCATION_RESOLVED",
   ],
-  Triage: ["TRUST_EVALUATED", "TRIAGE_RECORDED", "PRIORITY_SCORED"],
+  Triage: [
+    "NEWS_CORROBORATION",
+    "TRUST_EVALUATED",
+    "TRIAGE_RECORDED",
+    "PRIORITY_SCORED",
+  ],
   Governance: [
     "POLICY_EVALUATED",
     "NEEDS_REVIEW",
@@ -41,7 +46,14 @@ const eventsByStage: Record<Stage, AuditEventType[]> = {
     "ASSIGNMENT_COMPLETED",
     "ASSIGNMENT_FAILED",
   ],
-  System: ["SCENARIO_STARTED", "SCENARIO_EVENT", "SCENARIO_RESET"],
+  System: [
+    "SCENARIO_STARTED",
+    "SCENARIO_EVENT",
+    "SCENARIO_RESET",
+    "INTEL_SCAN",
+    "INTEL_ACCEPTED",
+    "INTEL_DISMISSED",
+  ],
 };
 export function stageOf(event: AuditEventType): Stage {
   return (

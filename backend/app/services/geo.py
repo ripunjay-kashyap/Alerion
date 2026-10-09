@@ -1,6 +1,8 @@
 """Location resolution + small geo helpers.
 
-Resolution order: known places (fixed coords, deterministic) → Mapbox geocoding constrained to the ops bbox.
+Resolution order: known places (fixed coords, deterministic) → Google Maps via SerpApi → Mapbox geocoding,
+all constrained to the ops bbox. Google goes before Mapbox because Mapbox's POI coverage of Guwahati is thin:
+it placed "Kamakhya Temple" ~5 km away (26.159, 91.753 vs 26.166, 91.706) and called it a precise hit.
 """
 
 import json
@@ -10,7 +12,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 
 from app.config import get_settings
-from app.services import mapbox
+from app.services import mapbox, serpapi
 
 OPS_CENTER = (91.765, 26.165)
 
@@ -22,7 +24,8 @@ class ResolvedLocation:
     lat: float
     confidence: float
     incident_zone: bool
-    source: str  # "known_place" | "mapbox" | "unresolved"
+    source: str  # "known_place" | "mapbox" | "google_maps" | "unresolved"
+    evidence: dict | None = None  # SerpApi place (title, address, place_id) when source == "google_maps"
 
 
 @lru_cache
@@ -56,6 +59,8 @@ async def resolve(location_text: str | None, raw_text: str = "") -> ResolvedLoca
             return ResolvedLocation(p["name"], p["lng"], p["lat"], 0.95, p["incident_zone"], "known_place")
     if not location_text:
         return None
+    if g := await google_maps_place(location_text):
+        return g
     try:
         hit = await mapbox.geocode(f"{location_text}, Guwahati", bbox(), OPS_CENTER)
     except mapbox.MapboxUnavailable:
@@ -65,6 +70,43 @@ async def resolve(location_text: str | None, raw_text: str = "") -> ResolvedLoca
     # street/address hits are precise; locality/place hits are coarse
     precise = hit.get("feature_type") in {"address", "street", "poi"}
     return ResolvedLocation(hit["name"], hit["lng"], hit["lat"], 0.8 if precise else 0.72, False, "mapbox")
+
+
+_GENERIC = {
+    "road",
+    "lane",
+    "near",
+    "behind",
+    "opposite",
+    "guwahati",
+    "assam",
+    "the",
+    "area",
+    "colony",
+    "path",
+}
+
+
+def _tokens(s: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]+", s.lower()) if len(w) >= 4 and w not in _GENERIC}
+
+
+async def google_maps_place(location_text: str) -> ResolvedLocation | None:
+    """Top Google Maps (SerpApi) result inside the ops bbox whose name or address shares a distinctive word
+    with what the reporter wrote. A name match keeps Google from 'helpfully' answering with a different place."""
+    try:
+        places = await serpapi.maps_search(f"{location_text}, Guwahati")
+    except serpapi.SerpApiUnavailable:
+        return None
+    want = _tokens(location_text)
+    for p in places[:5]:
+        if not in_bbox(p["lng"], p["lat"]):
+            continue
+        if want & _tokens(f"{p['title']} {p.get('address') or ''}"):
+            name = p["title"] if not p.get("address") else f"{p['title']}, {p['address']}"
+            evidence = {k: p.get(k) for k in ("title", "address", "type", "place_id")}
+            return ResolvedLocation(name, p["lng"], p["lat"], 0.8, False, "google_maps", evidence)
+    return None
 
 
 def haversine_m(a: tuple[float, float], b: tuple[float, float]) -> float:

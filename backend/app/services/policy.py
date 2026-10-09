@@ -40,6 +40,7 @@ def compute_trust(
     corroborations: int = 0,
     in_incident_zone: bool = False,
     location_confidence: float | None = None,
+    news_articles: int = 0,
 ) -> TrustResult:
     t = config()["trust"]
     base = float(t["base"].get(source_type, t["base"]["anonymous"]))
@@ -64,6 +65,14 @@ def compute_trust(
     ):
         mods.append({"label": "Low location confidence", "delta": t["modifiers"]["low_location_confidence"]})
     score = round(min(1.0, max(0.0, base + sum(m["delta"] for m in mods))), 2)
+    if news_articles >= config()["intel"]["news_min_articles"]:
+        cap = t["news_max_score"]
+        delta = round(min(t["modifiers"]["news_corroborated"], max(0.0, cap - score)), 2)
+        label = f"Corroborated by {news_articles} recent local news report(s) (SerpApi)"
+        if delta < t["modifiers"]["news_corroborated"]:
+            label += f" — capped at {cap:.2f}: news alone never verifies a report"
+        mods.append({"label": label, "delta": delta, "source": "serpapi"})
+        score = round(score + delta, 2)
     if score >= t["verified_threshold"]:
         status = "verified"
     elif score >= t["unverified_threshold"]:

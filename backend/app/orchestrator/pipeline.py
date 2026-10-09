@@ -8,7 +8,7 @@ import asyncio
 import logging
 
 from app.models import ReportStatus
-from app.services import audit, workflow
+from app.services import audit, intel, workflow
 from app.services.intake import extract
 from app.services.uow import unit_of_work
 from app.services.workflow import WorkflowError
@@ -49,10 +49,11 @@ async def process_report(report_id: str) -> None:
     try:
         async with unit_of_work() as s:
             report = await workflow.get_report(s, report_id)
-            status, raw = report.workflow_status, report.raw_text
+            status, raw, source = report.workflow_status, report.raw_text, report.source_type
         intake, triage = extract(raw)
 
         if status == ReportStatus.RECEIVED:
+            await intel.prefetch(intake.location_text, raw, source)  # SerpApi off the global lock
             await asyncio.sleep(STEP_DELAY_S)
             if gen != _generation:
                 return

@@ -11,10 +11,23 @@ trust:
     corroborated: 0.15           # another report within corroboration radius/window, different source
     in_known_incident_zone: 0.10
     low_location_confidence: -0.15
+    news_corroborated: 0.10      # recent local news (SerpApi: Google News / Google Search) names the same locality
+  # News is outside evidence, not a witness: it may lift a report out of low_trust, but it can never be what
+  # makes a report "verified", so it can never unlock a life-safety auto-dispatch (GOV-02) on its own.
+  news_max_score: 0.79
   corroboration_radius_m: 500
   corroboration_window_min: 30
   verified_threshold: 0.80
   unverified_threshold: 0.50
+
+intel:                           # SerpApi evidence layer (app/services/intel.py)
+  news_window_hours: 24          # only articles published in this window count as corroboration
+  news_min_articles: 1
+  suggestion_radius_m: 250       # radius of the flood zone proposed from a news scan
+  facility_queries:              # Google Maps lists real hospitals; "relief camp" only exists mid-disaster
+    medical: hospital
+    rescue: hospital
+    food: relief camp
 
 uncertainty:
   minimum_incident_confidence: 0.65

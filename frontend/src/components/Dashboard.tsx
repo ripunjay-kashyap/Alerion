@@ -14,6 +14,9 @@ import { clockTime } from "@/lib/format";
 import ReportForm from "./ReportForm";
 import PipelinePanel from "./PipelinePanel";
 import AuditTimeline from "./AuditTimeline";
+import IntelPanel from "./IntelPanel";
+import { SerpApiChip, useFacilities } from "./SerpApiEvidence";
+import type { IntelSuggestion } from "@/lib/types";
 
 const MapView = dynamic(() => import("./MapView"), {
   ssr: false,
@@ -46,6 +49,12 @@ export default function Dashboard() {
     [resetVersion],
   );
   const [drawerOpen, setDrawerOpen] = useState(true);
+  const [focus, setFocus] = useState<{ lng: number; lat: number; key: number } | null>(null);
+  const onFocus = useCallback(
+    (s: IntelSuggestion) => setFocus({ lng: s.longitude, lat: s.latitude, key: Date.now() }),
+    [],
+  );
+  const facilities = useFacilities(state?.reports.find((r) => r.id === selectedReportId));
   const [toast, setToast] = useState<{
     message: string;
     policyRule?: string;
@@ -105,6 +114,7 @@ export default function Dashboard() {
               refresh={refresh}
               onError={onError}
             />
+            <SerpApiChip state={state} />
             <SystemStatus connected={connected} />
           </div>
         </header>
@@ -131,6 +141,7 @@ export default function Dashboard() {
               state={state}
               selectedReportId={selectedReportId}
               onSelect={onSelect}
+              facilities={facilities}
             />
             <ReportForm
               refresh={refresh}
@@ -146,6 +157,8 @@ export default function Dashboard() {
               onSelect={onSelect}
               onAction={refresh}
               onError={onError}
+              facilities={facilities?.results ?? []}
+              focus={focus}
             />
             {routeInvalidation && (
               <RouteInvalidatedBanner
@@ -163,6 +176,12 @@ export default function Dashboard() {
               onSelect={onSelect}
               refresh={refresh}
               onError={onError}
+            />
+            <IntelPanel
+              state={state}
+              refresh={refresh}
+              onError={onError}
+              onFocus={onFocus}
             />
             <section className="policy-decisions">
               <div className="panel-heading">

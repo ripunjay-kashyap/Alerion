@@ -7,6 +7,7 @@ import type { Approval, OpsState, ReviewCorrections } from "@/lib/types";
 import { eta, percent } from "@/lib/format";
 import { approvalTitle, needText, sourceText } from "@/lib/copy";
 import VolunteerFunnel from "./VolunteerFunnel";
+import { SerpEvidence } from "./SerpApiEvidence";
 
 interface Props {
   state: OpsState | null;
@@ -182,6 +183,7 @@ export function ApprovalCard({
             </span>
           </div>
           <p className="incident-text">“{report.raw_text}”</p>
+          <SerpEvidence report={report} />
         </>
       )}
       {assignment && (

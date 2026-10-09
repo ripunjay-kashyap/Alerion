@@ -3,7 +3,7 @@
 import "mapbox-gl/dist/mapbox-gl.css";
 import mapboxgl, { type GeoJSONSource } from "mapbox-gl";
 import { useEffect, useRef, useState } from "react";
-import type { Assignment, Hazard, OpsState } from "@/lib/types";
+import type { Assignment, Facility, Hazard, OpsState } from "@/lib/types";
 import { api } from "@/lib/api";
 import VolunteerFunnel from "./VolunteerFunnel";
 import { ApiError, errorMessage } from "@/lib/errors";
@@ -21,6 +21,8 @@ interface Props {
   onSelect: (id: string | null) => void;
   onAction: () => Promise<void>;
   onError: (error: unknown) => void;
+  facilities?: Facility[]; // Google Maps (SerpApi) help points near the selected incident
+  focus?: { lng: number; lat: number; key: number } | null; // fly here (e.g. a news suggestion)
 }
 const EMPTY: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
@@ -50,7 +52,20 @@ const C = {
   label: "#eef1ff",
   halo: "#0a0e27",
   stroke: "#f5f7ff",
+  news: "#ff5ce1", // SerpApi news suggestion (not a confirmed hazard yet)
+  facility: "#5cffd6", // SerpApi Google Maps hospital / relief camp
 } as const;
+
+// Circle polygon in lng/lat for a suggestion radius (good enough at city scale).
+function circle(lng: number, lat: number, radiusM: number): GeoJSON.Polygon {
+  const dLat = radiusM / 111_000;
+  const dLng = dLat / Math.cos((lat * Math.PI) / 180);
+  const ring = Array.from({ length: 41 }, (_, i) => {
+    const a = (i / 40) * 2 * Math.PI;
+    return [lng + dLng * Math.cos(a), lat + dLat * Math.sin(a)];
+  });
+  return { type: "Polygon", coordinates: [ring] };
+}
 // Standard's night light preset dims custom layers unless they are emissive.
 const GLOW = 1;
 const reportColor = (status: string, priority: number | null) =>
@@ -79,6 +94,7 @@ function collections(
   state: OpsState,
   selected: string | null,
   pulses: Map<string, number>,
+  facilities: Facility[],
 ) {
   const fc = (features: GeoJSON.Feature[]): GeoJSON.FeatureCollection => ({
     type: "FeatureCollection",
@@ -165,6 +181,29 @@ function collections(
         properties: { id: v.id, status: v.status },
       })),
     ),
+    intel: fc(
+      (state.intel_suggestions ?? [])
+        .filter((s) => s.status === "pending")
+        .map((s) => ({
+          type: "Feature",
+          geometry: circle(s.longitude, s.latitude, s.radius_m),
+          properties: {
+            id: s.id,
+            label: `News: ${s.locality} (${s.evidence.length})`,
+          },
+        })),
+    ),
+    facilities: fc(
+      facilities.map((f, i) => ({
+        type: "Feature",
+        geometry: { type: "Point", coordinates: [f.lng, f.lat] },
+        properties: {
+          id: `facility-${i}`,
+          label: f.title,
+          open: f.open_now !== false,
+        },
+      })),
+    ),
   };
 }
 function updateMap(
@@ -172,8 +211,11 @@ function updateMap(
   state: OpsState,
   selected: string | null,
   pulses: Map<string, number>,
+  facilities: Facility[],
 ) {
-  for (const [id, data] of Object.entries(collections(state, selected, pulses)))
+  for (const [id, data] of Object.entries(
+    collections(state, selected, pulses, facilities),
+  ))
     (m.getSource(id) as GeoJSONSource | undefined)?.setData(data);
 }
 function addLayers(m: mapboxgl.Map) {
@@ -183,8 +225,44 @@ function addLayers(m: mapboxgl.Map) {
     "previous-routes",
     "incidents",
     "volunteers",
+    "intel",
+    "facilities",
   ])
     m.addSource(id, { type: "geojson", data: EMPTY });
+  // SerpApi layers sit under routes and pins: evidence, not decisions.
+  m.addLayer({
+    id: "intel-fill",
+    type: "fill",
+    source: "intel",
+    paint: {
+      "fill-color": C.news,
+      "fill-opacity": 0.12,
+      "fill-emissive-strength": GLOW,
+    },
+  });
+  m.addLayer({
+    id: "intel-line",
+    type: "line",
+    source: "intel",
+    paint: {
+      "line-color": C.news,
+      "line-width": 2,
+      "line-dasharray": [2, 1.5],
+      "line-emissive-strength": GLOW,
+    },
+  });
+  m.addLayer({
+    id: "intel-labels",
+    type: "symbol",
+    source: "intel",
+    layout: { "text-field": ["get", "label"], "text-size": 11 },
+    paint: {
+      "text-color": C.news,
+      "text-halo-color": C.halo,
+      "text-halo-width": 2,
+      "text-emissive-strength": GLOW,
+    },
+  });
   m.addLayer({
     id: "hazard-fill",
     type: "fill",
@@ -381,6 +459,36 @@ function addLayers(m: mapboxgl.Map) {
       "text-emissive-strength": GLOW,
     },
   });
+  m.addLayer({
+    id: "facilities",
+    type: "circle",
+    source: "facilities",
+    paint: {
+      "circle-radius": 6,
+      "circle-color": C.facility,
+      "circle-opacity": ["case", ["get", "open"], 1, 0.4],
+      "circle-stroke-color": C.halo,
+      "circle-stroke-width": 2,
+      "circle-emissive-strength": GLOW,
+    },
+  });
+  m.addLayer({
+    id: "facility-labels",
+    type: "symbol",
+    source: "facilities",
+    layout: {
+      "text-field": ["get", "label"],
+      "text-size": 10,
+      "text-offset": [0, 1.2],
+      "text-anchor": "top",
+    },
+    paint: {
+      "text-color": C.facility,
+      "text-halo-color": C.halo,
+      "text-halo-width": 2,
+      "text-emissive-strength": GLOW,
+    },
+  });
 }
 
 export default function MapView({
@@ -389,13 +497,15 @@ export default function MapView({
   onSelect,
   onAction,
   onError,
+  facilities = [],
+  focus = null,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const fitted = useRef(false);
   const activeHazards = useRef<Map<string, boolean>>(new Map());
   const pulses = useRef<Map<string, number>>(new Map());
-  const latest = useRef({ state, selectedReportId, onSelect });
+  const latest = useRef({ state, selectedReportId, onSelect, facilities });
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [popup, setPopup] = useState<Popup | null>(null);
@@ -404,13 +514,17 @@ export default function MapView({
   const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
   const hasToken = !!token && token !== "pk.xxxxx";
   useEffect(() => {
-    latest.current = { state, selectedReportId, onSelect };
+    if (focus && map.current)
+      map.current.flyTo({ center: [focus.lng, focus.lat], zoom: 14.2, duration: 1200 });
+  }, [focus]);
+  useEffect(() => {
+    latest.current = { state, selectedReportId, onSelect, facilities };
     for (const h of state?.hazards ?? []) {
       if (h.active && activeHazards.current.get(h.id) === false)
         pulses.current.set(h.id, Date.now());
       activeHazards.current.set(h.id, h.active);
     }
-  }, [state, selectedReportId, onSelect]);
+  }, [state, selectedReportId, onSelect, facilities]);
 
   useEffect(() => {
     if (!container.current || !hasToken) return;
@@ -456,9 +570,9 @@ export default function MapView({
       if (!m.isStyleLoaded()) setMapError(event.error.message);
     });
     const render = () => {
-      const { state, selectedReportId } = latest.current;
+      const { state, selectedReportId, facilities } = latest.current;
       if (!state || !m.getSource("incidents")) return;
-      updateMap(m, state, selectedReportId, pulses.current);
+      updateMap(m, state, selectedReportId, pulses.current, facilities);
       if (!fitted.current) {
         const bounds = new mapboxgl.LngLatBounds();
         for (const v of state.volunteers)
@@ -629,6 +743,13 @@ export default function MapView({
         </span>
         <span>
           <i style={{ background: C.onScene }} /> On scene
+        </span>
+        <span>
+          <b className="legend-dashed" style={{ borderColor: C.news }} /> News
+          report (SerpApi)
+        </span>
+        <span>
+          <i style={{ background: C.facility }} /> Hospital / camp (SerpApi)
         </span>
       </div>
       {(hazard || volunteer || report) && (

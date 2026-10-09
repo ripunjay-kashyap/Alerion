@@ -59,8 +59,101 @@ export interface TriageEvidence {
 
 export interface TrustBreakdown {
   base: number; // from source type
-  modifiers: { label: string; delta: number }[]; // e.g. {label:"Corroborated by INC-…", delta:0.15}
+  modifiers: { label: string; delta: number; source?: "serpapi" }[]; // e.g. {label:"Corroborated by INC-…", delta:0.15}
   score: number;
+  _news?: NewsEvidence | null; // SerpApi Google News check (null: verified source, or SerpApi unavailable)
+  _location?: {
+    source: "known_place" | "mapbox" | "google_maps";
+    place: {
+      title: string;
+      address: string | null;
+      type: string | null;
+      place_id: string | null;
+    } | null;
+  } | null;
+}
+
+// ---------- SerpApi evidence layer ----------
+
+export interface NewsArticle {
+  title: string;
+  source: string | null;
+  link: string;
+  iso_date: string | null;
+  engine: "google_news" | "google";
+}
+
+export interface NewsEvidence {
+  engine: "google_news";
+  query: string;
+  available: true;
+  articles: NewsArticle[]; // [] = no recent coverage (neutral)
+}
+
+export interface IntelSuggestion {
+  id: string; // "INT-…"
+  locality: string;
+  label: string;
+  longitude: number;
+  latitude: number;
+  radius_m: number;
+  location_source: "known_place" | "mapbox" | "google_maps";
+  evidence: NewsArticle[];
+  status: "pending" | "accepted" | "dismissed";
+  hazard_id: string | null;
+  created_at: string;
+}
+
+export interface IntelScan {
+  searches: { engine: string; query: string; results?: number; error?: string }[];
+  articles: number;
+  localities: string[];
+  created: string[];
+  refreshed: string[];
+  unresolved: string[];
+  suggestions: IntelSuggestion[];
+}
+
+export interface Facility {
+  title: string;
+  lng: number;
+  lat: number;
+  address: string | null;
+  type: string | null;
+  place_id: string | null;
+  open_state: string | null;
+  open_now: boolean | null;
+  phone: string | null;
+  rating: number | null;
+  distance_m: number;
+}
+
+export interface Facilities {
+  report_id: string;
+  engine: "google_maps" | null;
+  query: string | null;
+  available: boolean;
+  reason?: string | null;
+  results: Facility[];
+}
+
+export interface IntelStatus {
+  provider: "SerpApi";
+  mode: "live" | "cache_first" | "cache_only";
+  key_configured: boolean;
+  engines: string[];
+  session_usage: {
+    live_searches: number;
+    cache_hits: number;
+    failed: number;
+    by_engine: Record<string, number>;
+  };
+  account: {
+    plan: string | null;
+    searches_per_month: number | null;
+    searches_left: number | null;
+    this_month: number | null;
+  } | null;
 }
 
 export interface PriorityBreakdown {
@@ -139,7 +232,7 @@ export interface Hazard {
   geometry: GeoJSON.Polygon | GeoJSON.LineString;
   severity: "medium" | "high" | "critical";
   active: boolean;
-  source: "seed" | "operator" | "simulator";
+  source: "seed" | "operator" | "simulator" | "serpapi_news";
 }
 
 export interface Volunteer {
@@ -173,11 +266,12 @@ export interface OpsState {
   hazards: Hazard[];
   assignments: Assignment[];
   approvals: Approval[];
+  intel_suggestions?: IntelSuggestion[]; // optional: older backends and mock data omit it
 }
 
 export interface AuditEntry {
   seq: number; // monotonic; use as key + cursor
-  entity_type: "report" | "assignment" | "approval" | "hazard" | "system";
+  entity_type: "report" | "assignment" | "approval" | "hazard" | "system" | "intel";
   entity_id: string;
   report_id: string | null; // group the timeline per incident with this
   event_type: AuditEventType;
@@ -195,6 +289,7 @@ export type AuditEventType =
   | "REPORT_MERGED"
   | "INTAKE_STRUCTURED"
   | "LOCATION_RESOLVED"
+  | "NEWS_CORROBORATION"
   | "TRUST_EVALUATED"
   | "TRIAGE_RECORDED"
   | "PRIORITY_SCORED"
@@ -219,7 +314,10 @@ export type AuditEventType =
   | "ASSIGNMENT_FAILED"
   | "SCENARIO_STARTED"
   | "SCENARIO_EVENT"
-  | "SCENARIO_RESET";
+  | "SCENARIO_RESET"
+  | "INTEL_SCAN"
+  | "INTEL_ACCEPTED"
+  | "INTEL_DISMISSED";
 
 export interface ScenarioStatus {
   status: "idle" | "running" | "done";
@@ -262,7 +360,8 @@ export type EventName =
   | "volunteer.updated"
   | "audit.appended"
   | "scenario.updated"
-  | "system.reset";
+  | "system.reset"
+  | "intel.updated";
 export interface OpsEvent {
   event: EventName;
   data: Record<string, unknown>;

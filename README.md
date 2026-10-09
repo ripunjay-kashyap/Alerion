@@ -2,9 +2,9 @@
 
 **A governed disaster dispatch system: messy flood reports in, safe, auditable volunteer assignments and live Mapbox routes out.**
 
-Guwahati (Assam) flood scenario · FastAPI backend · Next.js frontend · Supabase · Mapbox
+Guwahati (Assam) flood scenario · FastAPI backend · Next.js frontend · Supabase · Mapbox · SerpApi
 
-- **Live dashboard:** _Vercel URL_
+- **Live dashboard:** https://alerion-two.vercel.app
 - **API:** https://alerion-backend.onrender.com ([docs](https://alerion-backend.onrender.com/docs))
 
 > Free-tier backend: open `/api/health` once to wake it before use.
@@ -29,6 +29,8 @@ different capabilities, and roads close in real time.
 7. **Reroutes live** when a new hazard cuts an active route (hero demo: ETA 9.7 → 13.3 min, old route shown dashed).
 8. **Audits everything.** Every extraction, score, policy decision, refusal, approval, dispatch and reroute, with the acting pipeline stage, system component or human.
 9. **Merges duplicates.** Near-duplicate reports fold into the existing incident and raise its trust instead of starting a second pipeline run or dispatch.
+10. **Checks the outside world with SerpApi.** Google Maps finds the landmarks people actually name, Google News corroborates a report
+    and scans for new flooding, and Google Maps lists open hospitals and relief camps near an incident. See [SerpApi evidence layer](#serpapi-evidence-layer).
 
 ## Architecture
 
@@ -42,6 +44,7 @@ The project has two parts: a FastAPI backend that owns every decision and all st
             ├─ report pipeline: intake → triage → governance → dispatch
             ├─ policy engine (policy.yaml): trust, priority, rules UNC-01 / GOV-01..99
             ├─ eligibility funnel + safe-route search (Mapbox Directions + shapely)
+            ├─ SerpApi evidence layer: Google Maps · Google News · Google Search (cached, audited)
             ├─ approvals, reroute engine (safety-monitor), audit trail
             └─ scenario simulator (timed or manual replay of scenarios/*.json)
 ```
@@ -57,6 +60,25 @@ of guessing. Everything safety-critical is deterministic code: trust, priority, 
 intersection, route safety, approvals and assignment state. **Every mutating step re-validates before it commits:** an
 assignment that fails eligibility or route safety is refused and audited, and approving a dispatch whose route has since
 become unsafe triggers a safe reroute, or a refusal (HTTP 409) when none exists.
+
+## SerpApi evidence layer
+
+Floods are reported in landmarks and headlines before they reach any official map. [SerpApi](https://serpapi.com) lets the
+backend read both, and every lookup is written to the audit trail. **SerpApi supplies evidence, and the deterministic policy
+engine still makes every decision.**
+
+| Where | SerpApi engine | What it does |
+|---|---|---|
+| Location resolution | `google_maps` | Known places → **Google Maps** → Mapbox. Google knows the landmarks people actually name: Mapbox put "Kamakhya Temple" ~5 km off and called it precise, while Google returns the temple (with `place_id`). The hit must sit inside the operations area and share a distinctive word with the report. |
+| Trust | `google_news` | Recent (24 h) headlines naming the report's locality and a flood term add `news_corroborated +0.10`. The articles are stored on the report and shown with the trust score. **Capped at 0.79**: news can lift a report out of `low_trust` but can never verify it, so it never unlocks a life-safety auto-dispatch (GOV-02) on its own. Finding no news is neutral. |
+| Hazard intel | `google_news` + `google` (`tbs=qdr:d`) | `POST /api/intel/scan` reads the past 24 h of news and web results, finds Guwahati localities named alongside flood terms, and proposes flood zones with their sources. A dispatcher **accepts** one to activate it as a real hazard, which runs the normal reroute check. |
+| Facilities | `google_maps` | `GET /api/reports/{id}/facilities`: hospitals for rescue and medical incidents, relief camps for food, open ones first, with phone numbers. |
+| Status | Account API | `GET /api/intel/status`: mode, searches used this session, plan and searches left. |
+
+Calls go through `app/services/serpapi.py` with the same modes as Mapbox (`SERPAPI_MODE=live | cache_first | cache_only`) and
+an on-disk cache in `backend/seed/serp_cache/`. Demo replays are repeatable and free (SerpApi doesn't count cached searches
+either), and tests never touch the network. Lookups the pipeline needs are prefetched outside the transaction lock, so a slow
+search never stalls other reports. Without a key, or offline, the layer is skipped and the pipeline behaves exactly as before.
 
 ## Repository layout
 
@@ -83,7 +105,7 @@ render.yaml           Render blueprint for the backend
 | GOV-03 | not life-safety **and** trust ≥ 0.50 | auto-dispatch |
 | GOV-99 | anything else | human approval (safe by default) |
 
-Trust: official 1.00 · verified operator 0.90 · citizen 0.55 · anonymous 0.40, +0.15 corroborated, +0.10 known incident zone, −0.15 low location confidence.
+Trust: official 1.00 · verified operator 0.90 · citizen 0.55 · anonymous 0.40, +0.15 corroborated, +0.10 known incident zone, −0.15 low location confidence, +0.10 recent local news via SerpApi (never above 0.79).
 
 ## Safe routing
 
@@ -121,7 +143,7 @@ npm ci && npm run dev
 
 ## Deploy
 
-- **Backend → Render** via `render.yaml`. Set `DATABASE_URL` (Supabase session pooler URI), `MAPBOX_TOKEN` and
+- **Backend → Render** via `render.yaml`. Set `DATABASE_URL` (Supabase session pooler URI), `MAPBOX_TOKEN`, `SERPAPI_KEY` and
   `CORS_ORIGINS` in the Render dashboard (`render.yaml` sets `MAPBOX_MODE=cache_first`). Runs as one instance with
   one worker, because the SSE event bus and the pipeline tasks are in-process.
 - **Frontend → Vercel** from `frontend/`. `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_MAPBOX_TOKEN` (a URL-restricted public

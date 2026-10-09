@@ -69,6 +69,7 @@ const actorNames: Record<string, string> = {
   "safety-monitor": "Safety",
   dispatcher: "Dispatcher",
   simulator: "Demo",
+  "serpapi-intel": "SerpApi",
 };
 export const actorText = (entry: AuditEntry) =>
   actorNames[entry.actor_id] ?? (entry.actor_type === "human" ? "Dispatcher" : "System");

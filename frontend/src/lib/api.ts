@@ -3,7 +3,11 @@ import type {
   Approval,
   ApprovalInput,
   AuditEntry,
+  Facilities,
   Hazard,
+  IntelScan,
+  IntelStatus,
+  IntelSuggestion,
   OpsState,
   Report,
   ReportInput,
@@ -101,6 +105,25 @@ export const api = {
     USE_MOCK
       ? mock().then((m) => m.reject(id, body))
       : post<Approval>(`/api/approvals/${idPath(id)}/reject`, body),
+  // SerpApi evidence layer. Mock mode has no SerpApi, so it answers "unavailable".
+  intelStatus: () =>
+    USE_MOCK
+      ? Promise.resolve<IntelStatus | null>(null)
+      : request<IntelStatus>("/api/intel/status"),
+  intelScan: () =>
+    USE_MOCK
+      ? Promise.reject(new ApiError("SerpApi isn’t available with sample data.", 503))
+      : post<IntelScan>("/api/intel/scan"),
+  acceptSuggestion: (id: string) =>
+    post<{ suggestion: IntelSuggestion; hazard: Hazard; rerouted_assignments: string[] }>(
+      `/api/intel/suggestions/${idPath(id)}/accept`,
+    ),
+  dismissSuggestion: (id: string) =>
+    post<IntelSuggestion>(`/api/intel/suggestions/${idPath(id)}/dismiss`),
+  facilities: (reportId: string) =>
+    USE_MOCK
+      ? Promise.resolve<Facilities | null>(null)
+      : request<Facilities>(`/api/reports/${idPath(reportId)}/facilities`),
   submitReport: (body: ReportInput) =>
     USE_MOCK
       ? mock().then((m) => m.submitReport(body))

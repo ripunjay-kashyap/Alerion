@@ -12,6 +12,8 @@ from app.services.seed import seed_reference_data
 from app.services.workflow import WorkflowError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+# httpx logs full request URLs at INFO, and SerpApi / Mapbox take their keys as query parameters.
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 
 @asynccontextmanager

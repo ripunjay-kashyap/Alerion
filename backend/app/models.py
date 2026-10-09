@@ -242,6 +242,24 @@ class AuditEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class IntelSuggestion(TimestampMixin, Base):
+    """A possible flood zone found by a SerpApi news/web scan. Inert until a dispatcher accepts it,
+    which creates and activates a Hazard (and so triggers the normal reroute check)."""
+
+    __tablename__ = "intel_suggestions"
+
+    id: Mapped[str] = mapped_column(String(16), primary_key=True, default=lambda: new_id("INT"))
+    locality: Mapped[str] = mapped_column(String(128))
+    label: Mapped[str] = mapped_column(String(256))
+    longitude: Mapped[float] = mapped_column(Float)
+    latitude: Mapped[float] = mapped_column(Float)
+    radius_m: Mapped[float] = mapped_column(Float)
+    location_source: Mapped[str] = mapped_column(String(32))
+    evidence: Mapped[list[dict[str, Any]]] = mapped_column(JsonType, default=list)  # articles that named it
+    status: Mapped[str] = mapped_column(String(16), default="pending")  # pending | accepted | dismissed
+    hazard_id: Mapped[str | None] = mapped_column(String(16))
+
+
 class SystemState(Base):
     """Single-row table (id=1)."""
 

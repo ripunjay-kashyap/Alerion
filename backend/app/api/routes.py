@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from app import simulator
+from app.config import get_settings
 from app.db import get_session
 from app.events import bus
 from app.models import (
@@ -16,6 +17,7 @@ from app.models import (
     AuditEntry,
     Hazard,
     HazardKind,
+    IntelSuggestion,
     Report,
     SystemState,
     Volunteer,
@@ -27,8 +29,13 @@ from app.schemas import (
     ApprovalResolveIn,
     AssignmentOut,
     AuditOut,
+    FacilitiesOut,
     HazardIn,
     HazardOut,
+    IntelAcceptOut,
+    IntelScanOut,
+    IntelStatusOut,
+    IntelSuggestionOut,
     ReportIn,
     ReportOut,
     ScenarioStartIn,
@@ -38,7 +45,7 @@ from app.schemas import (
     SystemStats,
     VolunteerOut,
 )
-from app.services import audit, reroute, workflow
+from app.services import audit, intel, reroute, serpapi, workflow
 from app.services.seed import reset_operational_state
 from app.services.uow import unit_of_work
 from app.services.workflow import WorkflowError
@@ -69,6 +76,9 @@ async def get_state(session: AsyncSession = Depends(get_session)) -> StateOut:
         hazards=(await session.scalars(select(Hazard).order_by(Hazard.id))).all(),
         assignments=(await session.scalars(select(Assignment).order_by(Assignment.created_at))).all(),
         approvals=(await session.scalars(select(Approval).order_by(Approval.created_at.desc()))).all(),
+        intel_suggestions=(
+            await session.scalars(select(IntelSuggestion).order_by(IntelSuggestion.created_at.desc()))
+        ).all(),
     )
 
 
@@ -128,6 +138,63 @@ async def reject(approval_id: str, body: ApprovalRejectIn | None = None):
             s, approval_id, approve=False, note=body.note, corrections=None, actor=audit.DISPATCHER
         )
     return appr
+
+
+@router.get("/reports/{report_id}/facilities", response_model=FacilitiesOut)
+async def report_facilities(report_id: str, session: AsyncSession = Depends(get_session)):
+    """Google Maps (SerpApi): hospitals for rescue and medical incidents, relief camps for food. Open ones first."""
+    report = await workflow.get_report(session, report_id)
+    return FacilitiesOut(report_id=report.id, **await intel.facilities(report))
+
+
+# ---------------- intel (SerpApi evidence layer)
+
+
+@router.get("/intel/status", response_model=IntelStatusOut)
+async def intel_status():
+    settings = get_settings()
+    return IntelStatusOut(
+        mode=settings.serpapi_mode,
+        key_configured=bool(settings.serpapi_key),
+        engines=["google_maps", "google_news", "google"],
+        session_usage={
+            "live_searches": serpapi.usage.live,
+            "cache_hits": serpapi.usage.cached,
+            "failed": serpapi.usage.failed,
+            "by_engine": serpapi.usage.by_engine,
+        },
+        account=await serpapi.account(),
+    )
+
+
+@router.post("/intel/scan", response_model=IntelScanOut)
+async def intel_scan():
+    found = await intel.gather()  # SerpApi calls happen outside the unit-of-work lock
+    async with unit_of_work() as s:
+        summary = await intel.scan(s, found)
+    async with unit_of_work() as s:
+        q = select(IntelSuggestion).where(IntelSuggestion.status == "pending")
+        pending = (await s.scalars(q.order_by(IntelSuggestion.created_at.desc()))).all()
+    return IntelScanOut(**summary, suggestions=pending)
+
+
+@router.get("/intel/suggestions", response_model=list[IntelSuggestionOut])
+async def intel_suggestions(session: AsyncSession = Depends(get_session)):
+    return (await session.scalars(select(IntelSuggestion).order_by(IntelSuggestion.created_at.desc()))).all()
+
+
+@router.post("/intel/suggestions/{suggestion_id}/accept", response_model=IntelAcceptOut)
+async def intel_accept(suggestion_id: str):
+    async with unit_of_work() as s:
+        sug, affected = await intel.accept(s, suggestion_id, audit.DISPATCHER)
+        hazard = await s.get(Hazard, sug.hazard_id)
+    return IntelAcceptOut(suggestion=sug, hazard=hazard, rerouted_assignments=affected)
+
+
+@router.post("/intel/suggestions/{suggestion_id}/dismiss", response_model=IntelSuggestionOut)
+async def intel_dismiss(suggestion_id: str):
+    async with unit_of_work() as s:
+        return await intel.dismiss(s, suggestion_id, audit.DISPATCHER)
 
 
 # ---------------- hazards
@@ -258,6 +325,7 @@ async def reset_scenario() -> dict:
     simulator.stop()
     pipeline.bump_generation()
     async with unit_of_work() as s:
+        await intel.clear(s)
         await reset_operational_state(s)
     bus.publish("system.reset")
     return {"ok": True}

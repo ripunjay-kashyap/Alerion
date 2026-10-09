@@ -1,10 +1,12 @@
 import os
 import tempfile
 
-# Isolated SQLite DB + offline Mapbox (seeded cache) — must be set before app modules import settings.
+# Isolated SQLite DB + offline Mapbox/SerpApi (seeded cache) — must be set before app modules import settings.
 _db = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
 os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///{_db.name}"
 os.environ.setdefault("MAPBOX_MODE", "cache_only")
+os.environ["SERPAPI_MODE"] = "cache_only"  # tests never spend SerpApi quota
+os.environ["SERPAPI_KEY"] = ""
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402

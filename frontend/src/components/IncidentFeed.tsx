@@ -1,15 +1,17 @@
 "use client";
 import { useEffect, useRef } from "react";
-import type { OpsState, Report } from "@/lib/types";
+import type { Facilities, OpsState, Report } from "@/lib/types";
 import { percent, eta } from "@/lib/format";
 import { needText, sourceText, statusText } from "@/lib/copy";
 import { useHighlight } from "@/lib/useHighlight";
 import GovernanceBadge from "./GovernanceBadge";
+import { NearbyHelp, SerpEvidence } from "./SerpApiEvidence";
 
 interface Props {
   state: OpsState | null;
   selectedReportId: string | null;
   onSelect: (id: string) => void;
+  facilities?: Facilities | null; // for the selected incident
 }
 export default function IncidentFeed(props: Props) {
   const reports = [...(props.state?.reports ?? [])]
@@ -60,6 +62,7 @@ export function IncidentCard({
   state,
   selectedReportId,
   onSelect,
+  facilities,
 }: Props & { report: Report; state: OpsState }) {
   const selected = report.id === selectedReportId;
   const ref = useRef<HTMLElement>(null);
@@ -153,6 +156,14 @@ export function IncidentCard({
             />
           ))}
       </div>
+      {selected ? (
+        <>
+          <SerpEvidence report={report} />
+          <NearbyHelp facilities={facilities ?? null} />
+        </>
+      ) : (
+        <SerpEvidence report={report} compact />
+      )}
       {assignment && (
         <div className="incident-assignment">
           <span>
