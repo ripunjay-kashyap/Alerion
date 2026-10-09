@@ -24,7 +24,7 @@ different capabilities, and roads close in real time.
 4. **Finds qualified responders** through an explainable funnel (availability → skill → medical certification → vehicle → safe route → ETA).
 5. **Generates safe routes** on real roads that avoid active flood zones and blocked roads.
 6. **Requires human approval** for sensitive dispatches. Approvals re-validate the route at approval time.
-7. **Reroutes live** when a new hazard cuts an active route (in the demo: ETA 9.7 → 13.3 min, with the old route shown dashed).
+7. **Reroutes live** when a new hazard cuts an active route (in the demo the ETA goes from 10 to 14 min, with the old route shown dashed).
 8. **Audits everything.** Every extraction, score, policy decision, refusal, approval, dispatch and reroute, with the acting pipeline stage, system component or human.
 9. **Merges duplicates.** Near-duplicate reports fold into the existing incident and raise its trust instead of starting a second pipeline run or dispatch.
 10. **Checks the outside world with SerpApi.** Google Maps finds the landmarks people actually name, Google News corroborates a report
@@ -74,12 +74,17 @@ engine still makes every decision.**
 | Status | Account API | `GET /api/intel/status`: mode, searches used this session, plan and searches left. |
 
 Calls go through `app/services/serpapi.py` with the same modes as Mapbox (`SERPAPI_MODE=live | cache_first | cache_only`) and
-an on-disk cache in `backend/seed/serp_cache/`. Demo replays are repeatable and free (SerpApi doesn't count cached searches
-either), and tests never touch the network. Time-bounded news and web searches are refetched once their cached copy is an hour
-old, so "past 24 h" stays true. SerpApi lookups the pipeline needs are prefetched outside the transaction lock (failures are
-remembered briefly too), so a slow search never stalls other reports. Error messages never include the request URL, so the API
-key can't leak into responses, the audit trail or logs. Without a key the cached results still replay; offline, the layer is
-skipped and the pipeline behaves exactly as before.
+an on-disk cache in `backend/seed/serp_cache/`:
+
+- **Cached and repeatable.** Google Maps answers are cached, so repeat lookups cost nothing. News and web searches are
+  "past 24 h" by nature, so their cached copy is refreshed once it's an hour old: the pipeline uses the cached copy
+  immediately and refreshes it in the background, while a dispatcher's scan waits for today's results.
+- **Never in the way.** Lookups the pipeline needs run outside the transaction lock, and failures are remembered briefly,
+  so a slow or failing search never stalls other reports.
+- **Safe with keys.** Error messages never include the request URL, so the API key can't leak into responses, the audit
+  trail or logs.
+- **Optional.** Without a key the cached results still replay; offline, the layer is skipped and the pipeline behaves
+  exactly as before. Tests never touch the network.
 
 ## Repository layout
 
@@ -92,7 +97,7 @@ backend/              FastAPI service
   policy.yaml         governance rules, scoring weights and SerpApi intel settings
   seed/               volunteers, hazards, known places, Guwahati localities, intake fixtures,
                       cached Mapbox and SerpApi responses (mapbox_cache/, serp_cache/)
-  tests/              offline end-to-end scenario tests
+  tests/              offline tests: the demo scenario end to end, and the SerpApi layer
 frontend/             Next.js + Mapbox operations dashboard (opt-in mock mode for UI work)
 scenarios/            replayable demo scenarios
 render.yaml           Render blueprint for the backend
@@ -126,19 +131,20 @@ scenario works even offline.
 | 13 s | Citizen: someone collapsed, Fancy Bazaar | duplicate merged (no second pipeline run), trust 0.55 → 0.70 |
 | 18 s | Citizen: drinking water for 15, Station Road | GOV-03 auto → V-06 (supply truck) |
 | 24 s | Anonymous: "help water everywhere pls" | UNC-01 human review |
-| 35 s | Flood zone HZ-02 activates | V-04 route invalidated → safe reroute, ETA 9.7 → 13.3 min |
+| 35 s | Flood zone HZ-02 activates | V-04 route invalidated → safe reroute, ETA 10 → 14 min |
 
 ## Run locally
 
 ```bash
 # backend
 cd backend
-cp .env.example .env            # DATABASE_URL (Supabase session pooler or sqlite), MAPBOX_TOKEN, SERPAPI_KEY
+cp .env.example .env            # DATABASE_URL: Supabase, or switch to the SQLite line in the file (no account needed)
+                                # MAPBOX_TOKEN: Mapbox token (the demo routes are cached, so it runs without one)
                                 # SERPAPI_KEY: free key from serpapi.com (250 searches/month). Without one, the demo
                                 # still replays the cached Google results in seed/serp_cache/; new lookups are skipped.
 uv sync
 uv run uvicorn app.main:app --reload --port 8000
-uv run pytest                   # offline end-to-end scenario tests (cached Mapbox responses)
+uv run pytest                   # offline tests (cached Mapbox and SerpApi responses, no network)
 
 # frontend
 cd frontend
