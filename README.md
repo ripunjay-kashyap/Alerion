@@ -130,7 +130,9 @@ scenario works even offline.
 ```bash
 # backend
 cd backend
-cp .env.example .env            # DATABASE_URL (Supabase session pooler or sqlite), MAPBOX_TOKEN
+cp .env.example .env            # DATABASE_URL (Supabase session pooler or sqlite), MAPBOX_TOKEN, SERPAPI_KEY
+                                # SERPAPI_KEY: free key from serpapi.com (250 searches/month). Without one, the demo
+                                # still replays the cached Google results in seed/serp_cache/; new lookups are skipped.
 uv sync
 uv run uvicorn app.main:app --reload --port 8000
 uv run pytest                   # offline end-to-end scenario tests (cached Mapbox responses)
@@ -156,3 +158,8 @@ It doesn't claim production emergency readiness, guaranteed safe routing, report
 decision-making. Human dispatchers remain authoritative for high-risk actions.
 
 Reusable beyond floods: earthquakes, wildfires, storms, humanitarian logistics, municipal emergency coordination.
+
+## AI tools used
+
+**Claude Code** was used as a coding co-pilot for the implementation. The idea, design decisions, testing and demo are
+the team's own.
