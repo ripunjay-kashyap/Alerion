@@ -142,7 +142,7 @@ async def reject(approval_id: str, body: ApprovalRejectIn | None = None):
 
 @router.get("/reports/{report_id}/facilities", response_model=FacilitiesOut)
 async def report_facilities(report_id: str, session: AsyncSession = Depends(get_session)):
-    """Google Maps (SerpApi): hospitals for rescue and medical incidents, relief camps for food. Open ones first."""
+    """Google Maps (SerpApi): hospitals near rescue and medical incidents. Open ones first."""
     report = await workflow.get_report(session, report_id)
     return FacilitiesOut(report_id=report.id, **await intel.facilities(report))
 

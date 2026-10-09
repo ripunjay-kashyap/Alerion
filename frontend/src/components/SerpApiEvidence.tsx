@@ -89,7 +89,7 @@ export function SerpEvidence({ report, compact = false }: { report: Report; comp
   );
 }
 
-/** Google Maps (SerpApi) hospitals or relief camps near the selected incident. */
+/** Google Maps (SerpApi) hospitals near the selected rescue or medical incident. */
 export function useFacilities(report: Report | undefined) {
   const [result, setResult] = useState<{ id: string; data: Facilities | null } | null>(null);
   const id = report?.id;
@@ -111,11 +111,10 @@ export function useFacilities(report: Report | undefined) {
 
 export function NearbyHelp({ facilities }: { facilities: Facilities | null }) {
   if (!facilities?.available || facilities.results.length === 0) return null;
-  const what = facilities.query === "hospital" ? "Nearest hospitals" : "Nearest relief camps";
   return (
-    <section className="serp-evidence" aria-label={what}>
+    <section className="serp-evidence" aria-label="Nearest hospitals">
       <div className="serp-evidence-head">
-        <span className="section-label">{what}</span>
+        <span className="section-label">Nearest hospitals</span>
         <SerpMark />
       </div>
       <ul className="serp-facilities">

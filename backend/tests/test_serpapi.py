@@ -225,6 +225,10 @@ async def test_facilities_open_first_and_in_area(client, serp):
     out = await intel.facilities(report)
     assert [p["title"] for p in out["results"]] == ["Near Open Hospital", "Far Closed Clinic"]
     assert out["results"][0]["open_now"] is True and out["results"][1]["open_now"] is False
+    # food: Google Maps has no real relief camps outside a disaster, so no lookup (and no search spent)
+    calls = len(serp)
+    food = Report(raw_text="x", source_type="citizen", need_type="food", latitude=26.1745, longitude=91.786)
+    assert (await intel.facilities(food))["available"] is False and len(serp) == calls
 
 
 # ---------------------------------------------------------------- scan → accept

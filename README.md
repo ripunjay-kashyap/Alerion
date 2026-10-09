@@ -30,7 +30,7 @@ different capabilities, and roads close in real time.
 8. **Audits everything.** Every extraction, score, policy decision, refusal, approval, dispatch and reroute, with the acting pipeline stage, system component or human.
 9. **Merges duplicates.** Near-duplicate reports fold into the existing incident and raise its trust instead of starting a second pipeline run or dispatch.
 10. **Checks the outside world with SerpApi.** Google Maps finds the landmarks people actually name, Google News corroborates a report
-    and scans for new flooding, and Google Maps lists open hospitals and relief camps near an incident. See [SerpApi evidence layer](#serpapi-evidence-layer).
+    and scans for new flooding, and Google Maps lists open hospitals near rescue and medical incidents. See [SerpApi evidence layer](#serpapi-evidence-layer).
 
 ## Architecture
 
@@ -72,7 +72,7 @@ engine still makes every decision.**
 | Location resolution | `google_maps` | Known places → **Google Maps** → Mapbox. Google knows the landmarks people actually name: Mapbox put "Kamakhya Temple" ~5 km off and called it precise, while Google returns the temple (with `place_id`). The hit must sit inside the operations area and share a distinctive word with the report. |
 | Trust | `google_news` | Recent (24 h) headlines naming the report's locality and a flood term add `news_corroborated +0.10`. The articles are stored on the report and shown with the trust score. **Capped at 0.79**: news can lift a report out of `low_trust` but can never verify it, so it never unlocks a life-safety auto-dispatch (GOV-02) on its own. Finding no news is neutral. |
 | Hazard intel | `google_news` + `google` (`tbs=qdr:d`) | `POST /api/intel/scan` reads the past 24 h of news and web results, finds Guwahati localities named alongside flood terms, and proposes flood zones with their sources. A dispatcher **accepts** one to activate it as a real hazard, which runs the normal reroute check. |
-| Facilities | `google_maps` | `GET /api/reports/{id}/facilities`: hospitals for rescue and medical incidents, relief camps for food, open ones first, with phone numbers. |
+| Facilities | `google_maps` | `GET /api/reports/{id}/facilities`: hospitals near rescue and medical incidents, open ones first, with phone numbers. Food incidents get no lookup (outside a disaster Google Maps has no real relief camps). |
 | Status | Account API | `GET /api/intel/status`: mode, searches used this session, plan and searches left. |
 
 Calls go through `app/services/serpapi.py` with the same modes as Mapbox (`SERPAPI_MODE=live | cache_first | cache_only`) and

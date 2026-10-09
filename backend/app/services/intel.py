@@ -1,7 +1,7 @@
 """SerpApi evidence layer: outside evidence for the decisions the policy engine makes.
 
   news_corroboration   recent Google News articles that name a report's locality → trust modifier
-  facilities           Google Maps hospitals / relief camps near an incident, open ones first
+  facilities           Google Maps hospitals near rescue/medical incidents, open ones first
   scan                 Google News + Google Search (past 24 h) → suggested flood zones for a dispatcher
   accept / dismiss     a dispatcher turns a suggestion into an active hazard (reroutes follow) or drops it
 
@@ -124,7 +124,9 @@ def _open_now(state: str | None) -> bool | None:
 async def facilities(report: Report) -> dict[str, Any]:
     if report.latitude is None or report.longitude is None:
         return {"query": None, "available": False, "reason": "report has no location", "results": []}
-    query = _cfg()["facility_queries"].get(report.need_type or "", "hospital")
+    query = _cfg()["facility_queries"].get(report.need_type or "")
+    if not query:
+        return {"query": None, "available": False, "reason": "no nearby-help search for this need", "results": []}
     try:
         places = await serpapi.maps_search(query, ll=f"@{report.latitude:.4f},{report.longitude:.4f},15z")
     except serpapi.SerpApiUnavailable as e:

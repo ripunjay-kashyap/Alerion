@@ -24,10 +24,9 @@ intel:                           # SerpApi evidence layer (app/services/intel.py
   news_window_hours: 24          # only articles published in this window count as corroboration
   news_min_articles: 1
   suggestion_radius_m: 250       # radius of the flood zone proposed from a news scan
-  facility_queries:              # Google Maps lists real hospitals; "relief camp" only exists mid-disaster
-    medical: hospital
+  facility_queries:              # needs not listed get no lookup: outside a disaster Google Maps has no real
+    medical: hospital            # relief camps, only lodges and NGOs, so food incidents show nothing
     rescue: hospital
-    food: relief camp
 
 uncertainty:
   minimum_incident_confidence: 0.65

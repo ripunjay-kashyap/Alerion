@@ -1,7 +1,7 @@
 """SerpApi client (https://serpapi.com) with an on-disk response cache.
 
 Engines used:
-  google_maps   resolve landmark-style locations; find open hospitals / relief camps near an incident
+  google_maps   resolve landmark-style locations; find open hospitals near an incident
   google_news   corroborate a report with recent local news; scan for new flooding
   google        recent web results (tbs=qdr:d) for the same scan
 

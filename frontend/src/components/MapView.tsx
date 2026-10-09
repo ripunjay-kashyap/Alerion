@@ -53,7 +53,7 @@ const C = {
   halo: "#0a0e27",
   stroke: "#f5f7ff",
   news: "#ff5ce1", // SerpApi news suggestion (not a confirmed hazard yet)
-  facility: "#5cffd6", // SerpApi Google Maps hospital / relief camp
+  facility: "#5cffd6", // SerpApi Google Maps hospital
 } as const;
 
 // Circle polygon in lng/lat for a suggestion radius (good enough at city scale).
@@ -749,7 +749,7 @@ export default function MapView({
           report (SerpApi)
         </span>
         <span>
-          <i style={{ background: C.facility }} /> Hospital / camp (SerpApi)
+          <i style={{ background: C.facility }} /> Hospital (SerpApi)
         </span>
       </div>
       {(hazard || volunteer || report) && (
